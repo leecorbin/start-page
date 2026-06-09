@@ -349,10 +349,10 @@ const DEFAULTS = {
   bg: { provider: "picsum", frequency: "tab", blur: 0, brightness: 70, tint: "#000000", tintStrength: 0, solid: "#13202f", local: [] },
   weather: { show: true, location: "", place: "", lat: null, lon: null, unit: "c" },
   links: [
-    { title: "Claude", url: "https://claude.ai", mono: false },
-    { title: "GitHub", url: "https://github.com", mono: false },
-    { title: "Gmail", url: "https://mail.google.com", mono: false },
-    { title: "YouTube", url: "https://www.youtube.com", mono: true },
+    { title: "Claude", url: "https://claude.ai" },
+    { title: "GitHub", url: "https://github.com" },
+    { title: "Gmail", url: "https://mail.google.com" },
+    { title: "YouTube", url: "https://www.youtube.com" },
   ],
   bangs: [
     { keyword: "imdb", name: "IMDb", url: "https://www.imdb.com/find/?q={q}" },
@@ -903,7 +903,6 @@ function brandSlug(host) {
 function monogramFor(l) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
 function makeGlyph(l) {
   if (l.icon) { const s = document.createElement("span"); s.className = "ql-glyph"; s.textContent = l.icon; return s; }
-  if (l.mono) return monogramFor(l);
   const host = hostOf(l.url);
   const favicon = `https://icons.duckduckgo.com/ip3/${host}.ico`;
   const slug = brandSlug(host);
@@ -950,17 +949,13 @@ function renderLinkEditor() {
     top.append(prev, title, up, down, del);
     const bot = document.createElement("div"); bot.className = "lcard-bot";
     const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "example.com"; url.value = l.url || "";
-    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = l.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides favicon)";
-    const mono = document.createElement("label"); mono.className = "lmono";
-    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!l.mono;
-    mono.append(cb, document.createTextNode("Aa"));
-    bot.append(url, icon, mono);
+    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = l.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides the brand icon)";
+    bot.append(url, icon);
     card.append(top, bot);
 
     const refreshPrev = () => { const g = makeGlyph(S.links[idx]); prev.innerHTML = ""; prev.appendChild(g); };
-    title.oninput = () => { S.links[idx].title = title.value; save(); renderLinks(); if (S.links[idx].mono) refreshPrev(); };
+    title.oninput = () => { S.links[idx].title = title.value; save(); renderLinks(); };
     url.oninput = () => { S.links[idx].url = url.value; save(); renderLinks(); refreshPrev(); };
-    cb.onchange = () => { S.links[idx].mono = cb.checked; save(); renderLinks(); refreshPrev(); };
     icon.oninput = () => { S.links[idx].icon = icon.value.trim(); save(); renderLinks(); refreshPrev(); };
     const move = (to) => { const t = S.links[idx]; S.links.splice(idx, 1); S.links.splice(to, 0, t); save(); renderLinks(); renderLinkEditor(); };
     up.onclick = () => move(idx - 1);
@@ -1045,7 +1040,7 @@ function bindControls() {
       () => wxStatus("Location blocked — type a city instead"));
   };
 
-  $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", mono: false }); save(); renderLinkEditor(); };
+  $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", icon: "" }); save(); renderLinkEditor(); };
   $("bang-add").onclick = () => { (S.bangs = S.bangs || []).push({ keyword: "", name: "", url: "", icon: "" }); save(); renderBangEditor(); };
 
   $("backup-export").onclick = exportSettings;

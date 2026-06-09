@@ -36,10 +36,11 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.
-- 🔗 **Quick links** — a row of monochrome, translucent icons: clean brand glyphs
-  via [Iconify Simple Icons](https://simpleicons.org) with a DuckDuckGo-favicon
-  fallback, plus a per-link **letter-monogram or emoji/symbol** override. Styled
-  **hover tooltips** and **reorderable** rows in a small inline editor.
+- 🔗 **Quick links & custom searches** share the same icons: clean brand glyphs
+  via [Iconify Simple Icons](https://simpleicons.org), falling back to the
+  DuckDuckGo favicon then a letter monogram, with an optional per-item
+  **emoji/symbol override** (⌃⌘Space). Quick links also have styled **hover
+  tooltips** and **reorderable** rows in a small inline editor.
 - 💾 **Export / import settings** — back up your whole config (and favourites) to a
   JSON file and restore it on another machine.
 - 🌗 **Dynamic contrast** — samples the background's brightness and flips text/icons

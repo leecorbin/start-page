@@ -82,6 +82,12 @@
   .field.mode-url .ic-search { display: none; }
   .field.mode-url .ic-globe { display: inline; }
   .field.mode-url, .field.mode-url:focus-within { border-color: rgba(120,222,160,0.8); }
+  .bang-chip { display: none; align-items: center; gap: 0.32rem; background: rgba(138,180,255,0.20); border: 1px solid rgba(138,180,255,0.42); border-radius: 8px; padding: 0.18rem 0.5rem; margin-right: 0.55rem; font-size: 0.92rem; white-space: nowrap; color: var(--fg); }
+  .field.mode-bang .bang-chip { display: inline-flex; }
+  .field.mode-bang .ic-search, .field.mode-bang .ic-globe { display: none; }
+  .bang-chip img { width: 16px; height: 16px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
+  .bang-chip .ql-glyph { font-size: 15px; }
+  .bang-chip .ql-mono { width: 16px; height: 16px; font-size: 9px; }
   #q { flex: 1; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
   .hints { max-width: 92vw; text-align: center; line-height: 1.7; font-size: 0.8rem; color: var(--muted); text-shadow: var(--halo); }
   .hk { white-space: nowrap; }
@@ -103,6 +109,7 @@
   body.lc-light #links img { filter: grayscale(1) brightness(0); opacity: 0.62; }
   body.lc-light #links a:hover { background: rgba(0,0,0,0.08); }
   body.lc-light .ql-mono { border-color: rgba(0,0,0,0.45); color: rgba(0,0,0,0.72); }
+  .ql-glyph { font-size: 20px; line-height: 1; display: grid; place-items: center; }
 
   #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
   #credit.show { opacity: 1; }
@@ -152,6 +159,9 @@
   .lprev .ql-mono { width: 22px; height: 22px; font-size: 11px; }
   .lcard input.ltitle { flex: 1; min-width: 0; }
   .lcard input.lurl { flex: 1; min-width: 0; font-size: 0.8rem; }
+  .lcard input.lkw { width: 60px; flex: none; }
+  .lcard input.licon { width: 50px; flex: none; text-align: center; font-size: 0.95rem; }
+  .grp-note { font-size: 0.72rem; color: var(--muted); margin: 0 0 0.6rem; line-height: 1.5; }
   .ldel { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 0.2rem; }
   .ldel:hover { color: #ff9a9a; }
   .lmove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.12rem; }
@@ -187,6 +197,7 @@
         <svg class="ic-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"></path>
         </svg>
+        <span id="bang-chip" class="bang-chip"></span>
         <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
       </div>
       <div class="hints" id="hints">
@@ -216,7 +227,7 @@
   <aside id="panel" aria-label="Settings panel">
     <div class="tabs">
       <button class="tab active" id="tab-btn-settings">Settings</button>
-      <button class="tab" id="tab-btn-links">Links</button>
+      <button class="tab" id="tab-btn-links">Shortcuts</button>
     </div>
     <div class="tabpane" id="tab-settings">
 
@@ -283,6 +294,12 @@
         <div id="link-editor"></div>
         <button class="minibtn" id="link-add" style="width:100%;margin-top:0.2rem;">+ Add link</button>
       </div>
+      <div class="group">
+        <label class="h">Custom searches</label>
+        <p class="grp-note">Type the <strong>key</strong> + space in the search box (e.g. <code>imdb </code>) then your query. URL uses <code>{q}</code>. Icon optional — ⌃⌘Space for emoji/symbols.</p>
+        <div id="bang-editor"></div>
+        <button class="minibtn" id="bang-add" style="width:100%;margin-top:0.2rem;">+ Add search</button>
+      </div>
     </div>
   </aside>
 
@@ -305,6 +322,15 @@ const DEFAULTS = {
     { title: "Gmail", url: "https://mail.google.com", mono: false },
     { title: "YouTube", url: "https://www.youtube.com", mono: true },
   ],
+  bangs: [
+    { keyword: "imdb", name: "IMDb", url: "https://www.imdb.com/find/?q={q}" },
+    { keyword: "rt", name: "Rotten Tomatoes", url: "https://www.rottentomatoes.com/search?search={q}" },
+    { keyword: "yt", name: "YouTube", url: "https://www.youtube.com/results?search_query={q}" },
+    { keyword: "wiki", name: "Wikipedia", url: "https://en.wikipedia.org/w/index.php?search={q}" },
+    { keyword: "gh", name: "GitHub", url: "https://github.com/search?q={q}" },
+    { keyword: "amazon", name: "Amazon", url: "https://www.amazon.co.uk/s?k={q}" },
+    { keyword: "gmap", name: "Google Maps", url: "https://www.google.com/maps/search/{q}" },
+  ],
 };
 const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx" };
 
@@ -316,7 +342,8 @@ function load() {
   return { ...DEFAULTS, ...r,
     bg: { ...DEFAULTS.bg, ...(r.bg || {}) },
     weather: { ...DEFAULTS.weather, ...(r.weather || {}) },
-    links: r.links || DEFAULTS.links };
+    links: r.links || DEFAULTS.links,
+    bangs: r.bangs || DEFAULTS.bangs };
 }
 let S = load();
 function save() { writeLS(K.set, S); }
@@ -429,20 +456,43 @@ function toUrl(s, aggressive) {
 function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (u) window.location.href = u; }
 
 const field = document.querySelector(".field");
+
+/* custom keyword searches ("bangs"): type "imdb " to enter IMDb-search mode */
+let activeBang = null;
+function bangByKeyword(kw) { return (S.bangs || []).find(b => b.keyword && b.keyword.toLowerCase() === kw.toLowerCase()); }
+function setBang(b) {
+  activeBang = b;
+  const chip = $("bang-chip"); chip.innerHTML = "";
+  chip.appendChild(makeGlyph(b));
+  chip.appendChild(document.createTextNode(b.name || b.keyword));
+  field.classList.remove("mode-url");
+  field.classList.add("mode-bang");
+}
+function clearBang() { activeBang = null; field.classList.remove("mode-bang"); }
+
 function updateMode() {
+  if (activeBang) return;   // the bang chip owns the field's look
   const t = input.value.trim();
   const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
   field.classList.toggle("mode-url", isUrl);
 }
-input.addEventListener("input", updateMode);
+input.addEventListener("input", () => {
+  if (!activeBang) {
+    const m = input.value.match(/^(\S+)\s(.*)$/);
+    if (m) { const b = bangByKeyword(m[1]); if (b) { setBang(b); input.value = m[2]; } }
+  }
+  updateMode();
+});
 input.addEventListener("keydown", (e) => {
+  if (e.key === "Backspace" && activeBang && input.value === "") { e.preventDefault(); clearBang(); updateMode(); return; }
   if (e.key !== "Enter") return;
   e.preventDefault();
   const q = input.value.trim();
-  if (e.metaKey || e.ctrlKey) return goClaude();           // ⌘↵  → Claude
-  if (e.altKey) return goSearch();                          // ⌥↵  → force search
-  if (q.startsWith("/")) return goUrl(q.slice(1), true);   // /addr → go to site
-  if (e.shiftKey) return goUrl(q, true);                   // ⇧↵  → force go to site
+  if (e.metaKey || e.ctrlKey) return goClaude();                                       // ⌘↵  → Claude
+  if (activeBang) { if (q) window.location.href = activeBang.url.replace("{q}", encodeURIComponent(q)); return; }
+  if (e.altKey) return goSearch();                                                     // ⌥↵  → force search
+  if (q.startsWith("/")) return goUrl(q.slice(1), true);                               // /addr → go to site
+  if (e.shiftKey) return goUrl(q, true);                                               // ⇧↵  → force go to site
   if (S.smartUrl && looksLikeUrl(q)) return goUrl(q, false);
   goSearch();
 });
@@ -657,7 +707,7 @@ function importSettings(file) {
     try {
       const data = JSON.parse(reader.result);
       const imp = data.settings || data;   // tolerate a raw settings object too
-      S = { ...DEFAULTS, ...imp, bg: { ...DEFAULTS.bg, ...(imp.bg || {}) }, weather: { ...DEFAULTS.weather, ...(imp.weather || {}) }, links: imp.links || DEFAULTS.links };
+      S = { ...DEFAULTS, ...imp, bg: { ...DEFAULTS.bg, ...(imp.bg || {}) }, weather: { ...DEFAULTS.weather, ...(imp.weather || {}) }, links: imp.links || DEFAULTS.links, bangs: imp.bangs || DEFAULTS.bangs };
       if (Array.isArray(data.favourites)) { FAVS = data.favourites; saveFavs(); }
       save();
       localStorage.removeItem(K.bg); localStorage.removeItem(K.next);
@@ -725,7 +775,8 @@ async function loadWeather() {
 function normUrl(u) { return /^https?:\/\//i.test(u) ? u : "https://" + u; }
 function hostOf(u) { try { return new URL(normUrl(u)).hostname; } catch { return ""; } }
 function initial(l) { return (l.title || hostOf(l.url) || "?").trim().charAt(0).toUpperCase(); }
-function makeGlyph(l, big) {
+function makeGlyph(l) {
+  if (l.icon) { const s = document.createElement("span"); s.className = "ql-glyph"; s.textContent = l.icon; return s; }
   const host = hostOf(l.url);
   if (l.mono) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
   const img = document.createElement("img"); img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`; img.alt = ""; img.loading = "lazy";
@@ -765,21 +816,49 @@ function renderLinkEditor() {
     top.append(prev, title, up, down, del);
     const bot = document.createElement("div"); bot.className = "lcard-bot";
     const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "example.com"; url.value = l.url || "";
+    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = l.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides favicon)";
     const mono = document.createElement("label"); mono.className = "lmono";
     const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!l.mono;
     mono.append(cb, document.createTextNode("Aa"));
-    bot.append(url, mono);
+    bot.append(url, icon, mono);
     card.append(top, bot);
 
     const refreshPrev = () => { const g = makeGlyph(S.links[idx]); prev.innerHTML = ""; prev.appendChild(g); };
     title.oninput = () => { S.links[idx].title = title.value; save(); renderLinks(); if (S.links[idx].mono) refreshPrev(); };
     url.oninput = () => { S.links[idx].url = url.value; save(); renderLinks(); refreshPrev(); };
     cb.onchange = () => { S.links[idx].mono = cb.checked; save(); renderLinks(); refreshPrev(); };
+    icon.oninput = () => { S.links[idx].icon = icon.value.trim(); save(); renderLinks(); refreshPrev(); };
     const move = (to) => { const t = S.links[idx]; S.links.splice(idx, 1); S.links.splice(to, 0, t); save(); renderLinks(); renderLinkEditor(); };
     up.onclick = () => move(idx - 1);
     down.onclick = () => move(idx + 1);
     del.onclick = () => { S.links.splice(idx, 1); save(); renderLinks(); renderLinkEditor(); };
 
+    wrap.appendChild(card);
+  });
+}
+
+function renderBangEditor() {
+  const wrap = $("bang-editor"); if (!wrap) return; wrap.innerHTML = "";
+  const bangs = S.bangs || [];
+  bangs.forEach((b, idx) => {
+    const card = document.createElement("div"); card.className = "lcard";
+    const top = document.createElement("div"); top.className = "lcard-top";
+    const prev = document.createElement("span"); prev.className = "lprev"; prev.appendChild(makeGlyph(b));
+    const kw = document.createElement("input"); kw.type = "text"; kw.className = "lkw"; kw.placeholder = "key"; kw.value = b.keyword || "";
+    const name = document.createElement("input"); name.type = "text"; name.className = "ltitle"; name.placeholder = "Name"; name.value = b.name || "";
+    const del = document.createElement("button"); del.className = "ldel"; del.textContent = "×"; del.title = "Remove";
+    top.append(prev, kw, name, del);
+    const bot = document.createElement("div"); bot.className = "lcard-bot";
+    const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "https://site/?q={q}"; url.value = b.url || "";
+    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = b.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides favicon)";
+    bot.append(url, icon);
+    card.append(top, bot);
+    const refreshPrev = () => { prev.innerHTML = ""; prev.appendChild(makeGlyph(S.bangs[idx])); };
+    kw.oninput = () => { S.bangs[idx].keyword = kw.value.trim(); save(); };
+    name.oninput = () => { S.bangs[idx].name = name.value; save(); };
+    url.oninput = () => { S.bangs[idx].url = url.value; save(); refreshPrev(); };
+    icon.oninput = () => { S.bangs[idx].icon = icon.value.trim(); save(); refreshPrev(); };
+    del.onclick = () => { S.bangs.splice(idx, 1); save(); renderBangEditor(); };
     wrap.appendChild(card);
   });
 }
@@ -797,6 +876,7 @@ function bindControls() {
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
   renderLinkEditor();
+  renderBangEditor();
   if (S.weather.place) wxStatus("✓ " + S.weather.place);
 
   const live = () => { applyBgStyle(); if (lastImg) analyzeContrast(lastImg); };
@@ -832,6 +912,7 @@ function bindControls() {
   };
 
   $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", mono: false }); save(); renderLinkEditor(); };
+  $("bang-add").onclick = () => { (S.bangs = S.bangs || []).push({ keyword: "", name: "", url: "", icon: "" }); save(); renderBangEditor(); };
 
   $("backup-export").onclick = exportSettings;
   $("backup-import").onclick = () => $("backup-file").click();

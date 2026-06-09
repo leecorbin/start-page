@@ -19,6 +19,12 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - `⌘↵` → **Ask Claude** (opens the Claude desktop app with your text prefilled)
   - `⌘L` still focuses Safari's real address bar (full history/autocomplete).
   - Smart detection is toggleable in settings.
+  - **Custom keyword searches** — type `imdb avatar` and the box flips to an
+    IMDb-search chip (showing the site's icon); `↵` goes straight to results.
+    Presets included (IMDb, Rotten Tomatoes, YouTube, Wikipedia, GitHub, Amazon,
+    Maps) and fully editable.
+  - **Pick your engine** — Ecosia (default), DuckDuckGo, Google, Brave, Startpage,
+    Qwant, Bing.
 - 🖼️ **Background of the day** from keyless providers, with photographer credit:
   - **Photos (Picsum)** — [Lorem Picsum](https://picsum.photos), no API key, images from Unsplash
   - **Favourites** — ⭐ any photo (stored by id, no files needed) and cycle through them
@@ -28,9 +34,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.
 - 🔗 **Quick links** — a row of monochrome, translucent favicons (via DuckDuckGo's
-  keyless icon service), with a per-link **letter-monogram** option for logos that
-  don't suit a single colour, styled **hover tooltips**, and **reorderable** rows
-  in a small inline editor.
+  keyless icon service), with a per-link **letter-monogram or emoji/symbol** icon
+  override, styled **hover tooltips**, and **reorderable** rows in a small inline
+  editor.
 - 💾 **Export / import settings** — back up your whole config (and favourites) to a
   JSON file and restore it on another machine.
 - 🌗 **Dynamic contrast** — samples the background's brightness and flips text/icons

@@ -70,11 +70,12 @@
   form { margin-top: 2.2rem; width: min(620px, 88vw); display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
   form[hidden] { display: none; }
   .field {
+    position: relative;
     width: 100%; display: flex; align-items: center; background: var(--field-bg);
     border: 1px solid var(--field-border); border-radius: 14px; padding: 0 1rem;
     box-shadow: 0 6px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
     transition: background 0.2s ease, border-color 0.2s ease;
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .field:focus-within { background: var(--field-bg-focus); border-color: var(--accent); }
   .field svg { flex: none; width: 20px; height: 20px; opacity: 0.6; }
@@ -102,14 +103,14 @@
   .ql-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: rgba(18,22,30,0.94); }
   #links a:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   #links a:hover { transform: translateY(-2px); background: rgba(255,255,255,0.10); }
-  #links img { width: 22px; height: 22px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.66; transition: opacity 0.15s ease; }
+  #links img { width: 22px; height: 22px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.55)); opacity: 0.85; transition: opacity 0.15s ease; }
   #links a:hover img { opacity: 1; }
-  .ql-mono { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5); display: grid; place-items: center; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.82); }
+  .ql-mono { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.6); display: grid; place-items: center; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.95); text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
   #links a:hover .ql-mono { color: #fff; border-color: rgba(255,255,255,0.8); }
-  body.lc-light #links img { filter: grayscale(1) brightness(0); opacity: 0.62; }
+  body.lc-light #links img { filter: grayscale(1) brightness(0) drop-shadow(0 1px 2px rgba(255,255,255,0.5)); opacity: 0.8; }
   body.lc-light #links a:hover { background: rgba(0,0,0,0.08); }
   body.lc-light .ql-mono { border-color: rgba(0,0,0,0.45); color: rgba(0,0,0,0.72); }
-  .ql-glyph { font-size: 20px; line-height: 1; display: grid; place-items: center; }
+  .ql-glyph { font-size: 20px; line-height: 1; display: grid; place-items: center; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
 
   #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
   #credit.show { opacity: 1; }
@@ -171,6 +172,27 @@
   .reset { margin-top: 0.5rem; width: 100%; background: rgba(255,80,80,0.14); border: 1px solid rgba(255,80,80,0.3); color: #ffb3b3; border-radius: 8px; padding: 0.5rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
   .reset:hover { background: rgba(255,80,80,0.22); }
   .hidden { display: none !important; }
+  /* suggestions dropdown */
+  .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 6; background: rgba(20,24,32,0.94); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
+  .suggest[hidden] { display: none; }
+  .sug-row { padding: 0.55rem 1rem; font-size: 1rem; color: var(--fg); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sug-row:hover, .sug-row.active { background: rgba(255,255,255,0.12); }
+  .sub-note { color: var(--muted); font-size: 0.78em; }
+
+  /* help / info modal */
+  .modal { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  .modal[hidden] { display: none; }
+  .modal-card { position: relative; width: min(460px, 90vw); max-height: 80vh; overflow-y: auto; background: var(--panel-bg); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; box-shadow: 0 24px 70px rgba(0,0,0,0.5); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); padding: 1.5rem 1.7rem 1.8rem; color: var(--fg); }
+  .modal-close { position: absolute; top: 0.7rem; right: 0.9rem; background: none; border: none; color: var(--muted); font-size: 1.5rem; line-height: 1; cursor: pointer; }
+  .modal-close:hover { color: var(--fg); }
+  .modal-card h2 { margin: 0 0 0.3rem; font-size: 1.3rem; font-weight: 500; }
+  .modal-card h3 { margin: 1.25rem 0 0.55rem; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .modal-card p { margin: 0.3rem 0; font-size: 0.9rem; line-height: 1.5; color: var(--muted); }
+  .modal-card ul { margin: 0.3rem 0; padding-left: 1.1rem; font-size: 0.9rem; line-height: 1.7; color: var(--muted); }
+  .help-keys { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.2rem; }
+  .help-keys td { padding: 0.26rem 0.6rem 0.26rem 0; vertical-align: top; color: var(--fg); }
+  .help-keys td:first-child { white-space: nowrap; width: 1%; color: var(--muted); }
+  .modal-card kbd, .help-keys kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; background: rgba(255,255,255,0.12); border-radius: 5px; padding: 0.05rem 0.4rem; font-size: 0.82em; }
 </style>
 </head>
 <body>
@@ -199,11 +221,13 @@
         </svg>
         <span id="bang-chip" class="bang-chip"></span>
         <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <div id="suggest" class="suggest" hidden></div>
       </div>
       <div class="hints" id="hints">
         <span class="hk"><kbd>⌥ ↵</kbd> search</span>
         <span class="hk"><kbd>⇧ ↵</kbd> go to site</span>
         <span class="hk"><kbd>⌘ ↵</kbd> ask Claude</span>
+        <span class="hk"><kbd>⌘ /</kbd> help</span>
       </div>
     </form>
 
@@ -273,6 +297,7 @@
       <div class="row"><span>Show search box</span><input id="s-showSearch" type="checkbox" /></div>
       <div class="row"><span>Focus box on load</span><input id="s-autofocus" type="checkbox" /></div>
       <div class="row"><span>Smart address detection</span><input id="s-smartUrl" type="checkbox" /></div>
+      <div class="row"><span>Web suggestions <span class="sub-note">· sends typing to Google</span></span><input id="s-webSuggest" type="checkbox" /></div>
       <div class="row"><span>Ask Claude opens</span><select id="s-claudeTarget"><option value="app">Desktop app</option><option value="web">claude.ai (web)</option></select></div>
     </div>
 
@@ -303,6 +328,13 @@
     </div>
   </aside>
 
+  <div id="help" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="help-close" aria-label="Close">×</button>
+      <div id="help-body"></div>
+    </div>
+  </div>
+
 <script>
 "use strict";
 
@@ -310,7 +342,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true,
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false,
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -482,8 +514,15 @@ input.addEventListener("input", () => {
     if (m) { const b = bangByKeyword(m[1]); if (b) { setBang(b); input.value = m[2]; } }
   }
   updateMode();
+  maybeSuggest();
 });
 input.addEventListener("keydown", (e) => {
+  if (sug.open) {
+    if (e.key === "ArrowDown") { e.preventDefault(); highlight(sug.idx + 1); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); highlight(sug.idx - 1); return; }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
+    if (e.key === "Enter" && sug.idx >= 0) { e.preventDefault(); chooseSuggest(sug.items[sug.idx]); return; }
+  }
   if (e.key === "Backspace" && activeBang && input.value === "") { e.preventDefault(); clearBang(); updateMode(); return; }
   if (e.key !== "Enter") return;
   e.preventDefault();
@@ -496,6 +535,84 @@ input.addEventListener("keydown", (e) => {
   if (S.smartUrl && looksLikeUrl(q)) return goUrl(q, false);
   goSearch();
 });
+
+/* ---- web suggestions (Google, opt-in) ---- */
+const suggestEl = $("suggest");
+let sug = { items: [], idx: -1, open: false };
+let sugTimer = null, sugSeq = 0, sugScript = null;
+function closeSuggest() { suggestEl.hidden = true; suggestEl.innerHTML = ""; sug.open = false; sug.idx = -1; sug.items = []; }
+function renderSuggest(items) {
+  items = (items || []).slice(0, 6);
+  sug.items = items; sug.idx = -1; suggestEl.innerHTML = "";
+  if (!items.length) { closeSuggest(); return; }
+  items.forEach((s) => {
+    const row = document.createElement("div"); row.className = "sug-row"; row.textContent = s;
+    row.onmousedown = (e) => { e.preventDefault(); chooseSuggest(s); };
+    suggestEl.appendChild(row);
+  });
+  suggestEl.hidden = false; sug.open = true;
+}
+function highlight(n) {
+  const rows = [...suggestEl.children];
+  if (!rows.length) return;
+  sug.idx = (n + rows.length) % rows.length;
+  rows.forEach((r, i) => r.classList.toggle("active", i === sug.idx));
+  input.value = sug.items[sug.idx];
+}
+function chooseSuggest(s) { input.value = s; closeSuggest(); goSearch(); }
+function fetchSuggest(q, cb) {
+  const id = "__sug" + (++sugSeq);
+  const cleanup = () => { try { delete window[id]; } catch {} if (sugScript) { sugScript.remove(); sugScript = null; } };
+  window[id] = (data) => { cleanup(); cb((data && data[1]) || []); };
+  if (sugScript) sugScript.remove();
+  sugScript = document.createElement("script");
+  sugScript.onerror = () => { cleanup(); cb([]); };
+  sugScript.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}&jsonp=${id}`;
+  document.head.appendChild(sugScript);
+}
+function maybeSuggest() {
+  if (!S.webSuggest || activeBang) { closeSuggest(); return; }
+  const q = input.value.trim();
+  if (!q || q.startsWith("/") || (S.smartUrl && looksLikeUrl(q))) { closeSuggest(); return; }
+  clearTimeout(sugTimer);
+  sugTimer = setTimeout(() => fetchSuggest(q, renderSuggest), 130);
+}
+input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
+
+/* ---- help / info popup (⌘/) ---- */
+function openHelp() {
+  const bangs = (S.bangs || []).filter(b => b.keyword).map(b =>
+    `<tr><td><kbd>${b.keyword}</kbd></td><td>${b.name || b.keyword}</td></tr>`).join("");
+  $("help-body").innerHTML =
+    `<h2>start-page</h2>
+     <p>A minimal, instant start page. Most things start from the search box — just type.</p>
+     <h3>What's here</h3>
+     <ul>
+       <li>Clock, greeting &amp; local weather</li>
+       <li>Photo-of-the-day backgrounds — ⭐ favourite or ⬇ download (buttons, bottom-right)</li>
+       <li>Quick links &amp; custom keyword searches</li>
+       <li>Everything's configurable in ⚙ Settings (bottom-right)</li>
+     </ul>
+     <h3>Search box</h3>
+     <table class="help-keys">
+       <tr><td><kbd>↵</kbd></td><td>Smart — web search, or open it if it looks like a site</td></tr>
+       <tr><td><kbd>⌥↵</kbd></td><td>Force web search</td></tr>
+       <tr><td><kbd>⇧↵</kbd> <kbd>/</kbd></td><td>Go to site (adds https / .com)</td></tr>
+       <tr><td><kbd>⌘↵</kbd></td><td>Ask Claude</td></tr>
+       <tr><td><kbd>⌘L</kbd></td><td>Safari address bar (history &amp; autocomplete)</td></tr>
+       <tr><td><kbd>⌘/</kbd></td><td>This help</td></tr>
+     </table>
+     ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;
+  $("help").hidden = false;
+}
+function closeHelp() { $("help").hidden = true; }
+$("help-close").onclick = closeHelp;
+$("help").addEventListener("click", (e) => { if (e.target === $("help")) closeHelp(); });
+document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === "/") { e.preventDefault(); $("help").hidden ? openHelp() : closeHelp(); }
+  else if (e.key === "Escape" && !$("help").hidden) { closeHelp(); }
+});
+
 function assertFocus() {
   if (!(S.showSearch && S.autofocus)) return;
   // Re-assert focus over ~1s to beat Safari re-focusing its address bar after a
@@ -775,12 +892,29 @@ async function loadWeather() {
 function normUrl(u) { return /^https?:\/\//i.test(u) ? u : "https://" + u; }
 function hostOf(u) { try { return new URL(normUrl(u)).hostname; } catch { return ""; } }
 function initial(l) { return (l.title || hostOf(l.url) || "?").trim().charAt(0).toUpperCase(); }
+function brandSlug(host) {
+  const parts = (host || "").split(".").filter(Boolean);
+  if (parts.length < 2) return "";
+  const twoLevel = new Set(["co", "com", "org", "net", "ac", "gov", "edu"]);
+  let i = parts.length - 2;
+  if (parts.length >= 3 && twoLevel.has(parts[parts.length - 2])) i = parts.length - 3;
+  return (parts[i] || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+function monogramFor(l) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
 function makeGlyph(l) {
   if (l.icon) { const s = document.createElement("span"); s.className = "ql-glyph"; s.textContent = l.icon; return s; }
+  if (l.mono) return monogramFor(l);
   const host = hostOf(l.url);
-  if (l.mono) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
-  const img = document.createElement("img"); img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`; img.alt = ""; img.loading = "lazy";
-  img.onerror = () => { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); img.replaceWith(m); };
+  const favicon = `https://icons.duckduckgo.com/ip3/${host}.ico`;
+  const slug = brandSlug(host);
+  const img = document.createElement("img"); img.alt = ""; img.loading = "lazy";
+  // Iconify brand glyph (clean monochrome logo) → favicon → monogram
+  if (slug) { img.src = `https://api.iconify.design/simple-icons/${slug}.svg`; img.dataset.stage = "brand"; }
+  else { img.src = favicon; img.dataset.stage = "favicon"; }
+  img.onerror = () => {
+    if (img.dataset.stage === "brand") { img.dataset.stage = "favicon"; img.src = favicon; }
+    else img.replaceWith(monogramFor(l));
+  };
   return img;
 }
 function renderLinks() {
@@ -871,7 +1005,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-claudeTarget", S.claudeTarget);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-claudeTarget", S.claudeTarget);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
@@ -921,6 +1055,7 @@ function bindControls() {
   $("s-showSearch").onchange = () => { S.showSearch = $("s-showSearch").checked; save(); applySearch(); };
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
+  $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
   $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };
 

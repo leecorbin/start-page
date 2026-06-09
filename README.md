@@ -25,6 +25,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     Maps) and fully editable.
   - **Pick your engine** — Ecosia (default), DuckDuckGo, Google, Brave, Startpage,
     Qwant, Bing.
+  - **Web suggestions** (off by default) — opt-in Google autocomplete with arrow-key
+    selection; clearly labelled "sends typing to Google", since no privacy engine
+    exposes suggestions to a static page.
 - 🖼️ **Background of the day** from keyless providers, with photographer credit:
   - **Photos (Picsum)** — [Lorem Picsum](https://picsum.photos), no API key, images from Unsplash
   - **Favourites** — ⭐ any photo (stored by id, no files needed) and cycle through them
@@ -33,10 +36,10 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.
-- 🔗 **Quick links** — a row of monochrome, translucent favicons (via DuckDuckGo's
-  keyless icon service), with a per-link **letter-monogram or emoji/symbol** icon
-  override, styled **hover tooltips**, and **reorderable** rows in a small inline
-  editor.
+- 🔗 **Quick links** — a row of monochrome, translucent icons: clean brand glyphs
+  via [Iconify Simple Icons](https://simpleicons.org) with a DuckDuckGo-favicon
+  fallback, plus a per-link **letter-monogram or emoji/symbol** override. Styled
+  **hover tooltips** and **reorderable** rows in a small inline editor.
 - 💾 **Export / import settings** — back up your whole config (and favourites) to a
   JSON file and restore it on another machine.
 - 🌗 **Dynamic contrast** — samples the background's brightness and flips text/icons
@@ -45,6 +48,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   greeting (12/24h, optional seconds).
 - ⚡️ **Instant images** — the *next* photo is prefetched during idle, so opening a
   new tab paints a fresh photo with no wait (after the first load).
+- ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
+  shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
   (every tab / hourly / daily / never), blur, brightness, tint, weather, quick
   links, and more. Settings persist in `localStorage`.

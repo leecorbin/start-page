@@ -258,6 +258,7 @@
 
     <div class="group">
       <label class="h">Search</label>
+      <div class="row"><span>Search engine</span><select id="s-engine"></select></div>
       <div class="row"><span>Show search box</span><input id="s-showSearch" type="checkbox" /></div>
       <div class="row"><span>Focus box on load</span><input id="s-autofocus" type="checkbox" /></div>
       <div class="row"><span>Smart address detection</span><input id="s-smartUrl" type="checkbox" /></div>
@@ -293,6 +294,7 @@ const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
   showSearch: true, autofocus: false, smartUrl: true,
+  searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
   bg: { provider: "picsum", frequency: "tab", blur: 0, brightness: 70, tint: "#000000", tintStrength: 0, solid: "#13202f", local: [] },
@@ -383,7 +385,17 @@ function startClock() {
 
 /* ============================ search ============================ */
 const input = $("q");
-function goSearch() { const q = input.value.trim(); if (q) window.location.href = S.searchUrl.replace("{q}", encodeURIComponent(q)); }
+const ENGINES = [
+  { id: "ecosia", name: "Ecosia", url: "https://www.ecosia.org/search?q={q}" },
+  { id: "duckduckgo", name: "DuckDuckGo", url: "https://duckduckgo.com/?q={q}" },
+  { id: "google", name: "Google", url: "https://www.google.com/search?q={q}" },
+  { id: "brave", name: "Brave", url: "https://search.brave.com/search?q={q}" },
+  { id: "startpage", name: "Startpage", url: "https://www.startpage.com/sp/search?query={q}" },
+  { id: "qwant", name: "Qwant", url: "https://www.qwant.com/?q={q}" },
+  { id: "bing", name: "Bing", url: "https://www.bing.com/search?q={q}" },
+];
+function engineUrl() { const e = ENGINES.find(x => x.id === S.searchEngine); return (e && e.url) || S.searchUrl; }
+function goSearch() { const q = input.value.trim(); if (q) window.location.href = engineUrl().replace("{q}", encodeURIComponent(q)); }
 function goClaude() {
   const q = input.value.trim().replace(/^\/+/, "");
   if (S.claudeTarget === "web") { window.location.href = "https://claude.ai/new"; return; }
@@ -781,6 +793,8 @@ function bindControls() {
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
   set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-claudeTarget", S.claudeTarget);
+  $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+  $("s-engine").value = S.searchEngine;
   syncDataWhen();
   renderLinkEditor();
   if (S.weather.place) wxStatus("✓ " + S.weather.place);
@@ -827,6 +841,7 @@ function bindControls() {
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
+  $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };
 
   $("s-reset").onclick = () => {
     if (!confirm("Reset all settings to defaults?")) return;

@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Start</title>
+<!--
+  start-page — a minimal, instant, local start page for Safari.
+  Copyright (c) 2026 Lee Corbin. MIT License (see LICENSE).
+  No tracking, no API keys, no server. Keyless providers only.
+-->
+<link rel="preconnect" href="https://picsum.photos" crossorigin />
+<link rel="preconnect" href="https://fastly.picsum.photos" crossorigin />
+<link rel="dns-prefetch" href="https://api.open-meteo.com" />
+<style>
+  :root {
+    --fg: #f4f6fb;
+    --muted: rgba(244, 246, 251, 0.62);
+    --field-bg: rgba(255, 255, 255, 0.15);
+    --field-bg-focus: rgba(255, 255, 255, 0.22);
+    --field-border: rgba(255, 255, 255, 0.22);
+    --accent: #8ab4ff;
+    --panel-bg: rgba(20, 24, 32, 0.84);
+    --halo: 0 1px 26px rgba(0, 0, 0, 0.45);
+    --halo-light: 0 1px 22px rgba(255, 255, 255, 0.55);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    color: var(--fg);
+    background: radial-gradient(120% 120% at 50% 0%, #1b2735 0%, #090a0f 70%);
+    background-color: #090a0f;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+
+  #bg { position: fixed; inset: -40px; background-size: cover; background-position: center; opacity: 0; transform: scale(1.06); transition: opacity 0.9s ease; z-index: 0; }
+  #bg.loaded { opacity: 1; }
+  #tint { position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0; }
+
+  .content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; animation: rise 0.6s ease both; transition: color 0.4s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .clock { font-size: clamp(3rem, 11vw, 7rem); font-weight: 200; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: var(--halo); }
+  .clock[hidden] { display: none; }
+
+  /* analogue clock */
+  #analog { display: block; width: clamp(190px, 30vw, 300px); height: clamp(190px, 30vw, 300px); aspect-ratio: 1 / 1; filter: drop-shadow(0 2px 14px rgba(0,0,0,0.4)); }
+  #analog[hidden] { display: none; }
+  #analog line { stroke-linecap: round; }
+  #analog .tick { stroke: rgba(255,255,255,0.55); }
+  #h-hour { stroke: #fff; stroke-width: 3.2; }
+  #h-min { stroke: #fff; stroke-width: 2.4; }
+  #h-sec { stroke: rgba(255,255,255,0.92); stroke-width: 1.1; }
+  #analog .pin { fill: #fff; }
+  body.lc-light #analog { filter: drop-shadow(0 2px 14px rgba(255,255,255,0.5)); }
+  body.lc-light #analog .tick { stroke: rgba(0,0,0,0.45); }
+  body.lc-light #h-hour, body.lc-light #h-min, body.lc-light #h-sec { stroke: #15181f; }
+  body.lc-light #analog .pin { fill: #15181f; }
+
+  .greeting { margin-top: 0.6rem; font-size: clamp(1rem, 2.6vw, 1.4rem); font-weight: 300; color: var(--muted); text-shadow: var(--halo); }
+
+  #weather { margin-top: 0.7rem; display: flex; align-items: center; gap: 0.45rem; font-size: 0.95rem; font-weight: 300; color: var(--muted); text-shadow: var(--halo); }
+  #weather[hidden] { display: none; }
+  #weather svg { width: 18px; height: 18px; }
+  .wx-sep { opacity: 0.5; }
+
+  form { margin-top: 2.2rem; width: min(620px, 88vw); display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+  form[hidden] { display: none; }
+  .field {
+    width: 100%; display: flex; align-items: center; background: var(--field-bg);
+    border: 1px solid var(--field-border); border-radius: 14px; padding: 0 1rem;
+    box-shadow: 0 6px 28px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.12);
+    transition: background 0.2s ease, border-color 0.2s ease;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  }
+  .field:focus-within { background: var(--field-bg-focus); border-color: var(--accent); }
+  .field svg { flex: none; width: 20px; height: 20px; opacity: 0.6; }
+  .field .ic-globe { display: none; }
+  .field.mode-url .ic-search { display: none; }
+  .field.mode-url .ic-globe { display: inline; }
+  .field.mode-url, .field.mode-url:focus-within { border-color: rgba(120,222,160,0.8); }
+  #q { flex: 1; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
+  .hints { max-width: 92vw; text-align: center; line-height: 1.7; font-size: 0.8rem; color: var(--muted); text-shadow: var(--halo); }
+  .hk { white-space: nowrap; }
+  .hk:not(:last-child)::after { content: "·"; margin: 0 0.25rem 0 0.6rem; opacity: 0.5; }
+  .hints kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; background: rgba(255,255,255,0.14); border-radius: 5px; padding: 0.05rem 0.35rem; }
+
+  /* quick links */
+  #links { margin-top: 1.7rem; display: flex; gap: 1.0rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
+  #links[hidden] { display: none; }
+  #links a { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; text-decoration: none; transition: transform 0.15s ease, background 0.15s ease; }
+  .ql-tip { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgba(18,22,30,0.94); color: #fff; font-size: 0.72rem; white-space: nowrap; padding: 0.3rem 0.6rem; border-radius: 9px; pointer-events: none; opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 5; }
+  .ql-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: rgba(18,22,30,0.94); }
+  #links a:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #links a:hover { transform: translateY(-2px); background: rgba(255,255,255,0.10); }
+  #links img { width: 22px; height: 22px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.66; transition: opacity 0.15s ease; }
+  #links a:hover img { opacity: 1; }
+  .ql-mono { width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.5); display: grid; place-items: center; font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.82); }
+  #links a:hover .ql-mono { color: #fff; border-color: rgba(255,255,255,0.8); }
+  body.lc-light #links img { filter: grayscale(1) brightness(0); opacity: 0.62; }
+  body.lc-light #links a:hover { background: rgba(0,0,0,0.08); }
+  body.lc-light .ql-mono { border-color: rgba(0,0,0,0.45); color: rgba(0,0,0,0.72); }
+
+  #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
+  #credit.show { opacity: 1; }
+  #credit a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
+  #credit a:hover { color: #fff; }
+  body.bl-light #credit { color: #1c1f26; text-shadow: 0 1px 8px rgba(255,255,255,0.6); }
+  body.bl-light #credit a { border-bottom-color: rgba(0,0,0,0.3); }
+
+  #controls { position: fixed; right: 14px; bottom: 12px; z-index: 3; display: flex; gap: 4px; }
+  .ctl { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.55); cursor: pointer; opacity: 0.4; transition: opacity 0.2s ease, background 0.2s ease, color 0.3s ease; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
+  .ctl:hover { opacity: 1; background: rgba(0,0,0,0.32); }
+  .ctl svg { width: 20px; height: 20px; }
+  #fav.on { color: #ffd479; opacity: 0.95; }
+  #controls.no-image #dl, #controls.no-image #fav { display: none; }
+  body.br-light .ctl { color: rgba(20,20,20,0.6); filter: drop-shadow(0 1px 3px rgba(255,255,255,0.5)); }
+  body.br-light .ctl:hover { background: rgba(255,255,255,0.32); }
+
+  /* settings panel */
+  #panel { position: fixed; top: 0; right: 0; height: 100%; width: min(360px, 88vw); z-index: 4; background: var(--panel-bg); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-left: 1px solid rgba(255,255,255,0.10); box-shadow: -20px 0 60px rgba(0,0,0,0.4); transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); overflow-y: auto; padding: 1.4rem 1.3rem 2rem; color: var(--fg); }
+  #panel.open { transform: none; }
+  #panel h2 { margin: 0 0 1rem; font-size: 1.05rem; font-weight: 500; }
+  .tabs { display: flex; gap: 0.3rem; margin-bottom: 1.2rem; background: rgba(255,255,255,0.06); padding: 0.25rem; border-radius: 10px; }
+  .tab { flex: 1; background: none; border: none; color: var(--muted); font: inherit; font-size: 0.88rem; padding: 0.45rem; border-radius: 7px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+  .tab:hover { color: var(--fg); }
+  .tab.active { background: rgba(255,255,255,0.14); color: var(--fg); }
+  #panel .group { margin-bottom: 1.4rem; }
+  #panel .group > label.h { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.6rem; }
+  #panel .row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin-bottom: 0.7rem; font-size: 0.9rem; }
+  #panel .row.col { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  #panel select, #panel input[type="text"], #panel textarea { background: rgba(255,255,255,0.08); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font-family: inherit; font-size: 0.88rem; padding: 0.4rem 0.5rem; }
+  #panel select { min-width: 130px; }
+  #panel input[type="range"] { width: 140px; accent-color: var(--accent); }
+  #panel input[type="color"] { width: 34px; height: 26px; padding: 0; border: 1px solid var(--field-border); border-radius: 6px; background: none; cursor: pointer; }
+  #panel input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+  #panel textarea { width: 100%; min-height: 70px; resize: vertical; }
+  #panel code { background: rgba(255,255,255,0.10); border-radius: 4px; padding: 0.05rem 0.3rem; font-size: 0.82em; }
+  .minibtn { background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.85rem; padding: 0.4rem 0.55rem; cursor: pointer; }
+  .minibtn:hover { background: rgba(255,255,255,0.18); }
+  #wx-status { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
+
+  /* link editor */
+  .lcard { background: rgba(255,255,255,0.05); border: 1px solid var(--field-border); border-radius: 9px; padding: 0.45rem 0.5rem; margin-bottom: 0.5rem; }
+  .lcard-top { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem; }
+  .lcard-bot { display: flex; align-items: center; gap: 0.5rem; }
+  .lprev { width: 26px; height: 26px; flex: none; display: grid; place-items: center; }
+  .lprev img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.85; }
+  .lprev .ql-mono { width: 22px; height: 22px; font-size: 11px; }
+  .lcard input.ltitle { flex: 1; min-width: 0; }
+  .lcard input.lurl { flex: 1; min-width: 0; font-size: 0.8rem; }
+  .ldel { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 0.2rem; }
+  .ldel:hover { color: #ff9a9a; }
+  .lmove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.12rem; }
+  .lmove:hover { color: #fff; }
+  .lmove:disabled { opacity: 0.25; cursor: default; }
+  .lmono { display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: var(--muted); cursor: pointer; flex: none; white-space: nowrap; }
+  .reset { margin-top: 0.5rem; width: 100%; background: rgba(255,80,80,0.14); border: 1px solid rgba(255,80,80,0.3); color: #ffb3b3; border-radius: 8px; padding: 0.5rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
+  .reset:hover { background: rgba(255,80,80,0.22); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <div id="bg"></div>
+  <div id="tint"></div>
+
+  <div class="content">
+    <div class="clock" id="clock">--:--</div>
+    <svg id="analog" viewBox="0 0 100 100" hidden aria-hidden="true">
+      <g id="ticks"></g>
+      <line id="h-hour" x1="50" y1="50" x2="50" y2="28"></line>
+      <line id="h-min" x1="50" y1="50" x2="50" y2="17"></line>
+      <line id="h-sec" x1="50" y1="55" x2="50" y2="14"></line>
+      <circle class="pin" cx="50" cy="50" r="1.9"></circle>
+    </svg>
+    <div class="greeting" id="greeting"></div>
+    <div id="weather" hidden></div>
+
+    <form id="form" autocomplete="off">
+      <div class="field">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <svg class="ic-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"></path>
+        </svg>
+        <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
+      </div>
+      <div class="hints" id="hints">
+        <span class="hk"><kbd>⌥ ↵</kbd> search</span>
+        <span class="hk"><kbd>⇧ ↵</kbd> go to site</span>
+        <span class="hk"><kbd>⌘ ↵</kbd> ask Claude</span>
+      </div>
+    </form>
+
+    <nav id="links" aria-label="Quick links" hidden></nav>
+  </div>
+
+  <div id="credit"></div>
+
+  <div id="controls">
+    <button class="ctl" id="dl" title="Download this image" aria-label="Download image">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"></path><path d="M7 11l5 5 5-5"></path><path d="M5 20h14"></path></svg>
+    </button>
+    <button class="ctl" id="fav" title="Favourite this image" aria-label="Favourite image">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.85-4.25 4.15 1 5.85L12 16.9l-5.25 2.8 1-5.85L3.5 9.65l5.9-.85z"></path></svg>
+    </button>
+    <button class="ctl" id="gear" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+    </button>
+  </div>
+
+  <aside id="panel" aria-label="Settings panel">
+    <div class="tabs">
+      <button class="tab active" id="tab-btn-settings">Settings</button>
+      <button class="tab" id="tab-btn-links">Links</button>
+    </div>
+    <div class="tabpane" id="tab-settings">
+
+    <div class="group">
+      <label class="h">Background</label>
+      <div class="row"><span>Source</span>
+        <select id="s-provider">
+          <option value="picsum">Photos (Picsum)</option>
+          <option value="favourites">Favourites</option>
+          <option value="local">Local folder</option>
+          <option value="solid">Solid colour</option>
+        </select>
+      </div>
+      <div class="row" data-when="picsum favourites local"><span>Change</span>
+        <select id="s-frequency"><option value="tab">Every new tab</option><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="paused">Never</option></select>
+      </div>
+      <div class="row" data-when="picsum favourites local"><span>Blur</span><input id="s-blur" type="range" min="0" max="40" step="1" /></div>
+      <div class="row" data-when="picsum favourites local"><span>Brightness</span><input id="s-brightness" type="range" min="15" max="120" step="1" /></div>
+      <div class="row" data-when="picsum favourites local"><span>Tint</span><span style="display:flex;align-items:center;gap:0.5rem;"><input id="s-tint" type="color" /><input id="s-tintStrength" type="range" min="0" max="80" step="1" style="width:84px;" /></span></div>
+      <div class="row" data-when="solid"><span>Colour</span><input id="s-solid" type="color" /></div>
+      <div class="row col" data-when="local"><span>Files in <code>backgrounds/</code> — one per line</span><textarea id="s-local" placeholder="sunset.jpg&#10;forest.jpg"></textarea></div>
+    </div>
+
+    <div class="group">
+      <label class="h">Clock &amp; greeting</label>
+      <div class="row"><span>Style</span><select id="s-clockStyle"><option value="digital">Digital</option><option value="analog">Analogue</option></select></div>
+      <div class="row" data-clock="digital"><span>24-hour clock</span><input id="s-clock24h" type="checkbox" /></div>
+      <div class="row" data-clock="digital"><span>Show seconds</span><input id="s-seconds" type="checkbox" /></div>
+      <div class="row col"><span>Your name</span><input id="s-name" type="text" placeholder="(optional)" /></div>
+    </div>
+
+    <div class="group">
+      <label class="h">Weather</label>
+      <div class="row"><span>Show weather</span><input id="s-wx-show" type="checkbox" /></div>
+      <div class="row col"><span>Location</span><span style="display:flex;gap:0.4rem;"><input id="s-wx-loc" type="text" placeholder="City" style="flex:1;" /><button class="minibtn" id="s-wx-geo" title="Use my location">📍</button></span></div>
+      <div class="row"><span>Units</span><select id="s-wx-unit"><option value="c">°C</option><option value="f">°F</option></select></div>
+      <div class="row" id="wx-status"></div>
+    </div>
+
+    <div class="group">
+      <label class="h">Search</label>
+      <div class="row"><span>Show search box</span><input id="s-showSearch" type="checkbox" /></div>
+      <div class="row"><span>Focus box on load</span><input id="s-autofocus" type="checkbox" /></div>
+      <div class="row"><span>Smart address detection</span><input id="s-smartUrl" type="checkbox" /></div>
+      <div class="row"><span>Ask Claude opens</span><select id="s-claudeTarget"><option value="app">Desktop app</option><option value="web">claude.ai (web)</option></select></div>
+    </div>
+
+    <div class="group">
+      <label class="h">Backup</label>
+      <div class="row" style="gap:0.4rem;">
+        <button class="minibtn" id="backup-export" style="flex:1;">Export…</button>
+        <button class="minibtn" id="backup-import" style="flex:1;">Import…</button>
+        <input type="file" id="backup-file" accept="application/json,.json" hidden />
+      </div>
+    </div>
+
+    <button class="reset" id="s-reset">Reset to defaults</button>
+    </div>
+
+    <div class="tabpane hidden" id="tab-links">
+      <div class="group">
+        <label class="h">Quick links</label>
+        <div id="link-editor"></div>
+        <button class="minibtn" id="link-add" style="width:100%;margin-top:0.2rem;">+ Add link</button>
+      </div>
+    </div>
+  </aside>
+
+<script>
+"use strict";
+
+/* ============================ defaults / state ============================ */
+const DEFAULTS = {
+  name: "Lee",
+  clockStyle: "digital", clock24h: true, showSeconds: false,
+  showSearch: true, autofocus: false, smartUrl: true,
+  searchUrl: "https://www.ecosia.org/search?q={q}",
+  claudeTarget: "app",
+  bg: { provider: "picsum", frequency: "tab", blur: 0, brightness: 70, tint: "#000000", tintStrength: 0, solid: "#13202f", local: [] },
+  weather: { show: true, location: "", place: "", lat: null, lon: null, unit: "c" },
+  links: [
+    { title: "Claude", url: "https://claude.ai", mono: false },
+    { title: "GitHub", url: "https://github.com", mono: false },
+    { title: "Gmail", url: "https://mail.google.com", mono: false },
+    { title: "YouTube", url: "https://www.youtube.com", mono: true },
+  ],
+};
+const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx" };
+
+const readLS = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
+const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+
+function load() {
+  const r = readLS(K.set) || {};
+  return { ...DEFAULTS, ...r,
+    bg: { ...DEFAULTS.bg, ...(r.bg || {}) },
+    weather: { ...DEFAULTS.weather, ...(r.weather || {}) },
+    links: r.links || DEFAULTS.links };
+}
+let S = load();
+function save() { writeLS(K.set, S); }
+
+let FAVS = readLS(K.favs) || [];
+function saveFavs() { writeLS(K.favs, FAVS); }
+
+let CURRENT = null, lastImg = null;
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const bgEl = $("bg"), tintEl = $("tint"), creditEl = $("credit");
+
+/* ============================ clock ============================ */
+function genTicks() {
+  const g = $("ticks");
+  for (let i = 0; i < 12; i++) {
+    const l = document.createElementNS(SVGNS, "line");
+    const big = i % 3 === 0;
+    l.setAttribute("x1", 50); l.setAttribute("y1", 5);
+    l.setAttribute("x2", 50); l.setAttribute("y2", big ? 11 : 9);
+    l.setAttribute("stroke-width", big ? 1.8 : 1);
+    l.setAttribute("class", "tick");
+    l.setAttribute("transform", `rotate(${i * 30} 50 50)`);
+    g.appendChild(l);
+  }
+}
+function updateAnalog(now) {
+  const s = now.getSeconds(), m = now.getMinutes(), h = now.getHours() % 12;
+  $("h-sec").setAttribute("transform", `rotate(${s * 6} 50 50)`);
+  $("h-min").setAttribute("transform", `rotate(${m * 6 + s * 0.1} 50 50)`);
+  $("h-hour").setAttribute("transform", `rotate(${h * 30 + m * 0.5} 50 50)`);
+}
+function tick() {
+  const now = new Date();
+  if (S.clockStyle === "analog") {
+    updateAnalog(now);
+  } else {
+    let h = now.getHours();
+    const m = String(now.getMinutes()).padStart(2, "0");
+    const s = String(now.getSeconds()).padStart(2, "0");
+    let suffix = "";
+    if (!S.clock24h) { suffix = h >= 12 ? " PM" : " AM"; h = h % 12 || 12; }
+    const hh = S.clock24h ? String(h).padStart(2, "0") : String(h);
+    $("clock").textContent = `${hh}:${m}${S.showSeconds ? ":" + s : ""}${suffix}`;
+  }
+  const hr = now.getHours();
+  const part = hr < 5 ? "Good night" : hr < 12 ? "Good morning" : hr < 18 ? "Good afternoon" : "Good evening";
+  $("greeting").textContent = S.name ? `${part}, ${S.name}.` : `${part}.`;
+}
+function applyClockStyle() {
+  const a = S.clockStyle === "analog";
+  // NB: <svg> is an SVGElement — its `.hidden` IDL prop doesn't reflect to the
+  // attribute, so toggle the attribute directly. (#clock is a div, .hidden is fine.)
+  if (a) $("analog").removeAttribute("hidden"); else $("analog").setAttribute("hidden", "");
+  $("clock").hidden = a;
+  document.querySelectorAll('#panel [data-clock]').forEach(el => el.classList.toggle("hidden", el.dataset.clock !== S.clockStyle));
+}
+let clockTimer;
+function startClock() {
+  clearInterval(clockTimer);
+  if (document.hidden) return;
+  tick();
+  const fast = S.clockStyle === "analog" || S.showSeconds;
+  clockTimer = setInterval(tick, fast ? 1000 : 15000);
+}
+
+/* ============================ search ============================ */
+const input = $("q");
+function goSearch() { const q = input.value.trim(); if (q) window.location.href = S.searchUrl.replace("{q}", encodeURIComponent(q)); }
+function goClaude() {
+  const q = input.value.trim().replace(/^\/+/, "");
+  if (S.claudeTarget === "web") { window.location.href = "https://claude.ai/new"; return; }
+  const base = "claude://claude.ai/new";
+  window.location.href = q ? `${base}?q=${encodeURIComponent(q)}` : base;
+}
+
+/* URL-vs-search detection — restores the address bar's "type either" magic.
+   Smart (no-prefix) detection only fires on a real common TLD so dotted search
+   terms like "node.js" aren't hijacked; explicit modes ( / and ⇧↵ ) are looser. */
+const TLDS = new Set(("com org net io ai co uk us ca de fr es it nl eu in jp cn au nz ch se no fi dk pl ru br mx kr za ie pt gr cz at be " +
+  "dev app edu gov me info biz xyz tv fm gg sh tech online site store shop blog cloud live work space news link page art design").split(" "));
+function looksLikeUrl(s) {
+  s = (s || "").trim();
+  if (!s || /\s/.test(s)) return false;
+  if (/^https?:\/\//i.test(s)) return true;
+  if (/^localhost(:\d+)?([\/?#]|$)/i.test(s)) return true;
+  if (/^\d{1,3}(\.\d{1,3}){3}(:\d+)?([\/?#]|$)/.test(s)) return true;
+  const host = s.split(/[\/?#]/)[0];
+  if (host.indexOf(".") < 0) return false;
+  return TLDS.has(host.split(".").pop().toLowerCase());
+}
+function toUrl(s, aggressive) {
+  s = (s || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^localhost(:\d+)?([\/?#]|$)/i.test(s) || /^\d{1,3}(\.\d{1,3}){3}/.test(s)) return "http://" + s;
+  if (aggressive && s.indexOf(".") < 0) s += ".com";   // auto-append in explicit URL mode
+  return "https://" + s;
+}
+function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (u) window.location.href = u; }
+
+const field = document.querySelector(".field");
+function updateMode() {
+  const t = input.value.trim();
+  const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
+  field.classList.toggle("mode-url", isUrl);
+}
+input.addEventListener("input", updateMode);
+input.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const q = input.value.trim();
+  if (e.metaKey || e.ctrlKey) return goClaude();           // ⌘↵  → Claude
+  if (e.altKey) return goSearch();                          // ⌥↵  → force search
+  if (q.startsWith("/")) return goUrl(q.slice(1), true);   // /addr → go to site
+  if (e.shiftKey) return goUrl(q, true);                   // ⇧↵  → force go to site
+  if (S.smartUrl && looksLikeUrl(q)) return goUrl(q, false);
+  goSearch();
+});
+function assertFocus() {
+  if (!(S.showSearch && S.autofocus)) return;
+  // Re-assert focus over ~1s to beat Safari re-focusing its address bar after a
+  // new tab/window opens. (Off by default; may grab focus from the address bar
+  // if you type there in the first second.)
+  [0, 80, 200, 400, 700, 1000].forEach(t => setTimeout(() => input.focus({ preventScroll: true }), t));
+}
+function applySearch() {
+  $("form").hidden = !S.showSearch;
+  assertFocus();
+}
+
+/* ============================ background ============================ */
+function size() { const dpr = devicePixelRatio || 1; return { w: Math.min(2400, Math.round(innerWidth * dpr)), h: Math.min(1600, Math.round(innerHeight * dpr)) }; }
+function applyBgStyle() {
+  const b = S.bg;
+  bgEl.style.filter = `blur(${b.blur}px) brightness(${b.brightness / 100})`;
+  tintEl.style.background = b.tint;
+  tintEl.style.opacity = (b.tintStrength / 100).toFixed(2);
+}
+
+const sampler = document.createElement("canvas");
+function analyzeContrast(img) {
+  try {
+    const W = 48, H = 27;
+    sampler.width = W; sampler.height = H;
+    const ctx = sampler.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, W, H);
+    const d = ctx.getImageData(0, 0, W, H).data;
+    const lum = (x0, x1, y0, y1) => {
+      let sum = 0, n = 0;
+      for (let y = y0 | 0; y < (y1 | 0); y++) for (let x = x0 | 0; x < (x1 | 0); x++) { const i = (y * W + x) * 4; sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; n++; }
+      return n ? sum / n : 0;
+    };
+    const dim = (S.bg.brightness / 100) * (1 - (S.bg.tintStrength / 100) * 0.6);
+    const eff = (l) => l * dim;
+    const TH = 150;
+    document.body.classList.toggle("lc-light", eff(lum(W * 0.2, W * 0.8, H * 0.12, H * 0.88)) > TH);
+    document.body.classList.toggle("bl-light", eff(lum(0, W * 0.42, H * 0.55, H)) > TH);
+    document.body.classList.toggle("br-light", eff(lum(W * 0.58, W, H * 0.55, H)) > TH);
+  } catch { document.body.classList.remove("lc-light", "bl-light", "br-light"); }
+}
+
+function setCredit(author, link) {
+  if (author) {
+    const href = link ? link + (link.includes("?") ? "&" : "?") + "utm_source=start-page&utm_medium=referral" : "#";
+    creditEl.innerHTML = `Photo by <a href="${href}" target="_blank" rel="noopener">${author}</a>`;
+    creditEl.classList.add("show");
+  } else creditEl.classList.remove("show");
+}
+function showImage(url, author, link, instant) {
+  if (instant) {
+    // Cached/prefetched image: paint it immediately with no fade so the dark
+    // gradient never flashes on a new tab.
+    const prev = bgEl.style.transition;
+    bgEl.style.transition = "none";
+    bgEl.style.backgroundImage = `url("${url}")`;
+    bgEl.classList.add("loaded");
+    void bgEl.offsetWidth;                 // commit before restoring transition
+    bgEl.style.transition = prev || "";
+    setCredit(author, link);
+  }
+  const img = new Image();
+  if (/^https?:/.test(url)) img.crossOrigin = "anonymous";
+  img.onload = () => {
+    if (!instant) {                        // fresh fetch: fade in once it's ready
+      bgEl.style.backgroundImage = `url("${url}")`;
+      bgEl.classList.add("loaded");
+      setCredit(author, link);
+    }
+    lastImg = img; analyzeContrast(img);
+  };
+  img.src = url;
+}
+
+async function getPicsumList() {
+  const c = readLS(K.list);
+  if (c && Date.now() - c.ts < 864e5 && c.items && c.items.length) return c.items;
+  const items = [];
+  for (const p of [1, 2, 3]) { const r = await fetch(`https://picsum.photos/v2/list?page=${p}&limit=100`); items.push(...await r.json()); }
+  writeLS(K.list, { ts: Date.now(), items });
+  return items;
+}
+async function fetchPicsum() {
+  const items = await getPicsumList();
+  const pick = items[Math.floor(Math.random() * items.length)];
+  const { w, h } = size();
+  return { provider: "picsum", ref: String(pick.id), url: `https://picsum.photos/id/${pick.id}/${w}/${h}`, author: pick.author, link: pick.url };
+}
+function pickLocal() {
+  const files = (S.bg.local || []).filter(Boolean);
+  if (!files.length) return null;
+  const f = S.bg.frequency;
+  const i = f === "daily" ? new Date().getDate() % files.length : f === "hourly" ? new Date().getHours() % files.length : Math.floor(Math.random() * files.length);
+  return { provider: "local", ref: files[i], url: `backgrounds/${files[i]}`, author: "", link: "" };
+}
+function pickFav() {
+  if (!FAVS.length) return null;
+  const f = S.bg.frequency;
+  const i = f === "daily" ? new Date().getDate() % FAVS.length : f === "hourly" ? new Date().getHours() % FAVS.length : Math.floor(Math.random() * FAVS.length);
+  const fav = FAVS[i], { w, h } = size();
+  const url = fav.provider === "local" ? `backgrounds/${fav.ref}` : `https://picsum.photos/id/${fav.ref}/${w}/${h}`;
+  return { provider: fav.provider, ref: fav.ref, url, author: fav.author || "", link: fav.link || "" };
+}
+async function chooseDescriptor() {
+  const p = S.bg.provider;
+  return p === "local" ? pickLocal() : p === "favourites" ? pickFav() : await fetchPicsum();
+}
+
+/* Prefetch the *next* image during idle so the next new tab paints instantly. */
+function prefetchNext() {
+  if (S.bg.frequency !== "tab" || S.bg.provider === "solid") return;
+  setTimeout(async () => {
+    try {
+      const d = await chooseDescriptor();
+      if (!d) return;
+      const im = new Image();
+      if (/^https?:/.test(d.url)) im.crossOrigin = "anonymous";
+      im.onload = () => writeLS(K.next, { ...d, mode: S.bg.provider });
+      im.src = d.url; // warms the browser cache
+    } catch {}
+  }, 400);
+}
+
+function bgCacheValid(c) {
+  if (!c || !c.url || c.mode !== S.bg.provider) return false;
+  const f = S.bg.frequency, now = Date.now();
+  if (f === "paused") return true;
+  if (f === "tab") return false;
+  if (f === "hourly") return now - c.ts < 3600e3;
+  if (f === "daily") return new Date(c.ts).toDateString() === new Date(now).toDateString();
+  return false;
+}
+function display(desc, instant) {
+  CURRENT = desc;
+  showImage(desc.url, desc.author, desc.link, instant);
+  $("controls").classList.remove("no-image");
+  updateStar();
+}
+function emptyState(provider) {
+  bgEl.classList.remove("loaded"); bgEl.style.backgroundImage = "none";
+  $("controls").classList.add("no-image"); CURRENT = null;
+  document.body.classList.remove("lc-light", "bl-light", "br-light");
+  creditEl.textContent = provider === "favourites" ? "No favourites yet — tap ☆ on a photo" : "Add image filenames in settings";
+  creditEl.classList.add("show");
+}
+async function refreshBackground(force) {
+  const b = S.bg;
+  creditEl.classList.remove("show");
+  if (b.provider === "solid") {
+    bgEl.classList.remove("loaded"); bgEl.style.backgroundImage = "none";
+    document.body.style.background = b.solid;
+    document.body.classList.remove("lc-light", "bl-light", "br-light");
+    $("controls").classList.add("no-image"); CURRENT = null;
+    return;
+  }
+  document.body.style.background = "";
+  const cache = readLS(K.bg);
+  if (!force && bgCacheValid(cache)) { display(cache, true); return; }   // hourly/daily/paused → instant
+  const nxt = readLS(K.next);
+  if (!force && nxt && nxt.mode === b.provider) {                        // every-tab → instant from prefetch
+    localStorage.removeItem(K.next);
+    display(nxt, true); writeLS(K.bg, { ...nxt, ts: Date.now() }); prefetchNext();
+    return;
+  }
+  try {
+    const desc = await chooseDescriptor();
+    if (!desc) { emptyState(b.provider); return; }
+    display(desc); writeLS(K.bg, { ...desc, ts: Date.now(), mode: b.provider }); prefetchNext();
+  } catch { if (cache && cache.url) display(cache); else emptyState(b.provider); }
+}
+
+/* favourites + download */
+function isFav(d) { return d && FAVS.some(f => f.provider === d.provider && String(f.ref) === String(d.ref)); }
+function updateStar() { $("fav").classList.toggle("on", isFav(CURRENT)); }
+function toggleFav() {
+  if (!CURRENT) return;
+  const i = FAVS.findIndex(f => f.provider === CURRENT.provider && String(f.ref) === String(CURRENT.ref));
+  if (i >= 0) FAVS.splice(i, 1); else FAVS.push({ provider: CURRENT.provider, ref: CURRENT.ref, author: CURRENT.author, link: CURRENT.link });
+  saveFavs(); updateStar();
+}
+async function downloadCurrent() {
+  if (!CURRENT || !CURRENT.url) return;
+  const name = CURRENT.provider === "picsum" ? `picsum-${CURRENT.ref}${CURRENT.author ? "-" + CURRENT.author.replace(/\s+/g, "_") : ""}.jpg` : (CURRENT.ref || "background.jpg");
+  try {
+    const r = await fetch(CURRENT.url, { mode: "cors" });
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch { window.open(CURRENT.url, "_blank"); }
+}
+$("dl").onclick = downloadCurrent;
+$("fav").onclick = toggleFav;
+
+/* settings backup */
+function exportSettings() {
+  const data = { app: "start-page", version: 1, settings: S, favourites: FAVS };
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
+  a.download = "start-page-settings.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function importSettings(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      const imp = data.settings || data;   // tolerate a raw settings object too
+      S = { ...DEFAULTS, ...imp, bg: { ...DEFAULTS.bg, ...(imp.bg || {}) }, weather: { ...DEFAULTS.weather, ...(imp.weather || {}) }, links: imp.links || DEFAULTS.links };
+      if (Array.isArray(data.favourites)) { FAVS = data.favourites; saveFavs(); }
+      save();
+      localStorage.removeItem(K.bg); localStorage.removeItem(K.next);
+      bindControls(); applyClockStyle(); startClock(); applySearch(); applyBgStyle(); refreshBackground(true); renderLinks(); loadWeather();
+    } catch { alert("Couldn't read that settings file."); }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================ weather ============================ */
+const I = {
+  sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`,
+  cloud: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17.5 9.5 3.75 3.75 0 0 1 17.5 18z"/></svg>`,
+  cloudSun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="7.5" r="2.3"/><path d="M7.5 1.8v1.1M2.4 7.5h1.1M3.6 3.6l.8.8M11.4 3.6l-.8.8"/><path d="M9 20a3.5 3.5 0 0 1-.4-6.98A4.8 4.8 0 0 1 18 14.5 3.25 3.25 0 0 1 18 20z"/></svg>`,
+  cloudMoon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 3.8a3.4 3.4 0 1 0 3.7 5 4.3 4.3 0 0 1-3.7-5z"/><path d="M9 20a3.5 3.5 0 0 1-.4-6.98A4.8 4.8 0 0 1 18 14.5 3.25 3.25 0 0 1 18 20z"/></svg>`,
+  rain: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17.5 6.5 3.75 3.75 0 0 1 17.5 15z"/><path d="M8 18l-1 2.5M12 18l-1 2.5M16 18l-1 2.5"/></svg>`,
+  snow: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17.5 5.5 3.75 3.75 0 0 1 17.5 14z"/><path d="M8 18h.01M12 19h.01M16 18h.01M10 20.6h.01M14 20.6h.01"/></svg>`,
+  fog: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 8h16M4 12h16M6 16h12M7 20h10"/></svg>`,
+  thunder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 14a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17.5 5.5 3.75 3.75 0 0 1 17.5 14z"/><path d="M12 13.5l-2.2 3.5H13l-2 3.5"/></svg>`,
+};
+function wmo(c, day) {
+  if (c === 0 || c === 1) return { icon: day ? I.sun : I.moon, label: c === 0 ? "Clear" : "Mostly clear" };
+  if (c === 2) return { icon: day ? I.cloudSun : I.cloudMoon, label: "Partly cloudy" };
+  if (c === 3) return { icon: I.cloud, label: "Overcast" };
+  if (c === 45 || c === 48) return { icon: I.fog, label: "Fog" };
+  if (c >= 51 && c <= 57) return { icon: I.rain, label: "Drizzle" };
+  if (c >= 61 && c <= 67) return { icon: I.rain, label: "Rain" };
+  if (c >= 71 && c <= 77) return { icon: I.snow, label: "Snow" };
+  if (c >= 80 && c <= 82) return { icon: I.rain, label: "Showers" };
+  if (c >= 85 && c <= 86) return { icon: I.snow, label: "Snow showers" };
+  if (c >= 95) return { icon: I.thunder, label: "Thunderstorm" };
+  return { icon: I.cloud, label: "—" };
+}
+async function geocode(name) {
+  const r = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`);
+  const j = await r.json();
+  if (!j.results || !j.results.length) throw new Error("not found");
+  const g = j.results[0];
+  S.weather.lat = g.latitude; S.weather.lon = g.longitude; S.weather.place = g.name; save();
+  return g.name;
+}
+function renderWeather(cur) {
+  if (!cur) { $("weather").hidden = true; return; }
+  const { icon, label } = wmo(cur.weather_code, cur.is_day);
+  const deg = Math.round(cur.temperature_2m);
+  $("weather").innerHTML = `${icon}<span>${deg}°</span><span class="wx-sep">·</span><span>${label}</span>` + (S.weather.place ? `<span class="wx-sep">·</span><span>${S.weather.place}</span>` : "");
+  $("weather").hidden = false;
+}
+async function loadWeather() {
+  const w = S.weather;
+  if (!w.show || w.lat == null) { $("weather").hidden = true; return; }
+  const c = readLS(K.wx);
+  if (c && Date.now() - c.ts < 18e5 && c.unit === w.unit && c.lat === w.lat) { renderWeather(c.data); return; }
+  try {
+    const unit = w.unit === "f" ? "fahrenheit" : "celsius";
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${w.lat}&longitude=${w.lon}&current=temperature_2m,weather_code,is_day&temperature_unit=${unit}&timezone=auto`);
+    const j = await r.json();
+    writeLS(K.wx, { ts: Date.now(), unit: w.unit, lat: w.lat, data: j.current });
+    renderWeather(j.current);
+  } catch { $("weather").hidden = true; }
+}
+
+/* ============================ quick links ============================ */
+function normUrl(u) { return /^https?:\/\//i.test(u) ? u : "https://" + u; }
+function hostOf(u) { try { return new URL(normUrl(u)).hostname; } catch { return ""; } }
+function initial(l) { return (l.title || hostOf(l.url) || "?").trim().charAt(0).toUpperCase(); }
+function makeGlyph(l, big) {
+  const host = hostOf(l.url);
+  if (l.mono) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
+  const img = document.createElement("img"); img.src = `https://icons.duckduckgo.com/ip3/${host}.ico`; img.alt = ""; img.loading = "lazy";
+  img.onerror = () => { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); img.replaceWith(m); };
+  return img;
+}
+function renderLinks() {
+  const nav = $("links"); nav.innerHTML = "";
+  (S.links || []).filter(l => l.url).forEach(l => {
+    const label = l.title || hostOf(l.url);
+    const a = document.createElement("a"); a.href = normUrl(l.url); a.setAttribute("aria-label", label);
+    a.appendChild(makeGlyph(l));
+    if (label) { const tip = document.createElement("span"); tip.className = "ql-tip"; tip.textContent = label; a.appendChild(tip); }
+    nav.appendChild(a);
+  });
+  nav.hidden = !(S.links && S.links.some(l => l.url));
+}
+
+/* ============================ settings panel ============================ */
+function syncDataWhen() {
+  const p = S.bg.provider;
+  document.querySelectorAll("#panel [data-when]").forEach(el => el.classList.toggle("hidden", !el.dataset.when.split(" ").includes(p)));
+}
+function wxStatus(t) { $("wx-status").textContent = t || ""; }
+
+function renderLinkEditor() {
+  const wrap = $("link-editor"); wrap.innerHTML = "";
+  const links = S.links || [];
+  links.forEach((l, idx) => {
+    const card = document.createElement("div"); card.className = "lcard";
+    const top = document.createElement("div"); top.className = "lcard-top";
+    const prev = document.createElement("span"); prev.className = "lprev"; prev.appendChild(makeGlyph(l));
+    const title = document.createElement("input"); title.type = "text"; title.className = "ltitle"; title.placeholder = "Title"; title.value = l.title || "";
+    const up = document.createElement("button"); up.className = "lmove"; up.textContent = "↑"; up.title = "Move up"; up.disabled = idx === 0;
+    const down = document.createElement("button"); down.className = "lmove"; down.textContent = "↓"; down.title = "Move down"; down.disabled = idx === links.length - 1;
+    const del = document.createElement("button"); del.className = "ldel"; del.textContent = "×"; del.title = "Remove";
+    top.append(prev, title, up, down, del);
+    const bot = document.createElement("div"); bot.className = "lcard-bot";
+    const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "example.com"; url.value = l.url || "";
+    const mono = document.createElement("label"); mono.className = "lmono";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!l.mono;
+    mono.append(cb, document.createTextNode("Aa"));
+    bot.append(url, mono);
+    card.append(top, bot);
+
+    const refreshPrev = () => { const g = makeGlyph(S.links[idx]); prev.innerHTML = ""; prev.appendChild(g); };
+    title.oninput = () => { S.links[idx].title = title.value; save(); renderLinks(); if (S.links[idx].mono) refreshPrev(); };
+    url.oninput = () => { S.links[idx].url = url.value; save(); renderLinks(); refreshPrev(); };
+    cb.onchange = () => { S.links[idx].mono = cb.checked; save(); renderLinks(); refreshPrev(); };
+    const move = (to) => { const t = S.links[idx]; S.links.splice(idx, 1); S.links.splice(to, 0, t); save(); renderLinks(); renderLinkEditor(); };
+    up.onclick = () => move(idx - 1);
+    down.onclick = () => move(idx + 1);
+    del.onclick = () => { S.links.splice(idx, 1); save(); renderLinks(); renderLinkEditor(); };
+
+    wrap.appendChild(card);
+  });
+}
+
+function bindControls() {
+  const set = (id, v) => { const el = $(id); el.type === "checkbox" ? (el.checked = v) : (el.value = v); };
+  set("s-provider", S.bg.provider); set("s-frequency", S.bg.frequency);
+  set("s-blur", S.bg.blur); set("s-brightness", S.bg.brightness);
+  set("s-tint", S.bg.tint); set("s-tintStrength", S.bg.tintStrength);
+  set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
+  set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
+  set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-claudeTarget", S.claudeTarget);
+  syncDataWhen();
+  renderLinkEditor();
+  if (S.weather.place) wxStatus("✓ " + S.weather.place);
+
+  const live = () => { applyBgStyle(); if (lastImg) analyzeContrast(lastImg); };
+
+  $("s-provider").onchange = () => { S.bg.provider = $("s-provider").value; syncDataWhen(); save(); refreshBackground(true); };
+  $("s-frequency").onchange = () => { S.bg.frequency = $("s-frequency").value; save(); refreshBackground(true); };
+  $("s-blur").oninput = () => { S.bg.blur = +$("s-blur").value; save(); live(); };
+  $("s-brightness").oninput = () => { S.bg.brightness = +$("s-brightness").value; save(); live(); };
+  $("s-tint").oninput = () => { S.bg.tint = $("s-tint").value; save(); live(); };
+  $("s-tintStrength").oninput = () => { S.bg.tintStrength = +$("s-tintStrength").value; save(); live(); };
+  $("s-solid").oninput = () => { S.bg.solid = $("s-solid").value; save(); refreshBackground(true); };
+  $("s-local").onchange = () => { S.bg.local = $("s-local").value.split("\n").map(x => x.trim()).filter(Boolean); save(); refreshBackground(true); };
+
+  $("s-clockStyle").onchange = () => { S.clockStyle = $("s-clockStyle").value; save(); applyClockStyle(); startClock(); };
+  $("s-clock24h").onchange = () => { S.clock24h = $("s-clock24h").checked; save(); startClock(); };
+  $("s-seconds").onchange = () => { S.showSeconds = $("s-seconds").checked; save(); startClock(); };
+  $("s-name").oninput = () => { S.name = $("s-name").value; save(); tick(); };
+
+  $("s-wx-show").onchange = () => { S.weather.show = $("s-wx-show").checked; save(); loadWeather(); };
+  $("s-wx-loc").onchange = async () => {
+    const v = $("s-wx-loc").value.trim(); S.weather.location = v;
+    if (!v) { S.weather.lat = null; S.weather.place = ""; save(); loadWeather(); wxStatus(""); return; }
+    wxStatus("Looking up…");
+    try { const n = await geocode(v); wxStatus("✓ " + n); loadWeather(); } catch { wxStatus("Couldn’t find that place"); }
+  };
+  $("s-wx-unit").onchange = () => { S.weather.unit = $("s-wx-unit").value; save(); loadWeather(); };
+  $("s-wx-geo").onclick = () => {
+    if (!navigator.geolocation) { wxStatus("Geolocation unavailable"); return; }
+    wxStatus("Locating…");
+    navigator.geolocation.getCurrentPosition(
+      p => { S.weather.lat = p.coords.latitude; S.weather.lon = p.coords.longitude; S.weather.place = ""; S.weather.location = ""; $("s-wx-loc").value = ""; save(); wxStatus("✓ Using your location"); loadWeather(); },
+      () => wxStatus("Location blocked — type a city instead"));
+  };
+
+  $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", mono: false }); save(); renderLinkEditor(); };
+
+  $("backup-export").onclick = exportSettings;
+  $("backup-import").onclick = () => $("backup-file").click();
+  $("backup-file").onchange = (e) => { const f = e.target.files[0]; if (f) importSettings(f); e.target.value = ""; };
+
+  $("s-showSearch").onchange = () => { S.showSearch = $("s-showSearch").checked; save(); applySearch(); };
+  $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
+  $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
+  $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
+
+  $("s-reset").onclick = () => {
+    if (!confirm("Reset all settings to defaults?")) return;
+    Object.values(K).forEach(k => localStorage.removeItem(k));
+    FAVS = []; S = load();
+    bindControls(); applyClockStyle(); startClock(); applySearch(); applyBgStyle(); refreshBackground(true); renderLinks(); loadWeather();
+  };
+}
+
+const panel = $("panel");
+function switchTab(name) {
+  $("tab-settings").classList.toggle("hidden", name !== "settings");
+  $("tab-links").classList.toggle("hidden", name !== "links");
+  $("tab-btn-settings").classList.toggle("active", name === "settings");
+  $("tab-btn-links").classList.toggle("active", name === "links");
+}
+$("tab-btn-settings").onclick = () => switchTab("settings");
+$("tab-btn-links").onclick = () => switchTab("links");
+$("gear").onclick = (e) => { e.stopPropagation(); panel.classList.toggle("open"); };
+// Keep clicks inside the panel from reaching the "click-outside closes" handler.
+// (Reorder/delete rebuild the editor and detach the clicked node, which would
+// otherwise read as an outside click and dismiss the panel.)
+panel.addEventListener("click", (e) => e.stopPropagation());
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("open"); });
+document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target)) panel.classList.remove("open"); });
+document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });
+
+/* ============================ boot ============================ */
+genTicks();
+applyClockStyle();
+startClock();
+applySearch();
+updateMode();
+applyBgStyle();
+refreshBackground(false);
+renderLinks();
+loadWeather();
+bindControls();
+window.addEventListener("pageshow", assertFocus);
+</script>
+</body>
+</html>

@@ -4,6 +4,8 @@ A minimal, **instant** browser start page — a single `index.html` with no buil
 step, no tracking, and no API keys. Host it anywhere or just open it locally.
 Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 
+![start-page running as a Safari new-tab page](screenshot.png)
+
 ## Features
 
 - ⚡️ **Instant load** — one self-contained file. A gradient paints immediately;

@@ -111,6 +111,16 @@
   body.lc-light #links a:hover { background: rgba(0,0,0,0.08); }
   body.lc-light .ql-mono { border-color: rgba(0,0,0,0.45); color: rgba(0,0,0,0.72); }
   .ql-glyph { font-size: 20px; line-height: 1; display: grid; place-items: center; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+  #links.size-medium { gap: 1.2rem; }
+  #links.size-medium a { width: 46px; height: 46px; border-radius: 12px; }
+  #links.size-medium img { width: 30px; height: 30px; }
+  #links.size-medium .ql-mono { width: 32px; height: 32px; font-size: 15px; }
+  #links.size-medium .ql-glyph { font-size: 27px; }
+  #links.size-large { gap: 1.45rem; }
+  #links.size-large a { width: 60px; height: 60px; border-radius: 14px; }
+  #links.size-large img { width: 40px; height: 40px; }
+  #links.size-large .ql-mono { width: 42px; height: 42px; font-size: 19px; }
+  #links.size-large .ql-glyph { font-size: 36px; }
 
   #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
   #credit.show { opacity: 1; }
@@ -316,6 +326,7 @@
     <div class="tabpane hidden" id="tab-links">
       <div class="group">
         <label class="h">Quick links</label>
+        <div class="row"><span>Icon size</span><select id="s-iconSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
         <div id="link-editor"></div>
         <button class="minibtn" id="link-add" style="width:100%;margin-top:0.2rem;">+ Add link</button>
       </div>
@@ -342,7 +353,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false,
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, iconSize: "small",
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -916,6 +927,11 @@ function makeGlyph(l) {
   };
   return img;
 }
+function applyIconSize() {
+  const el = $("links");
+  el.classList.remove("size-small", "size-medium", "size-large");
+  el.classList.add("size-" + (S.iconSize || "small"));
+}
 function renderLinks() {
   const nav = $("links"); nav.innerHTML = "";
   (S.links || []).filter(l => l.url).forEach(l => {
@@ -926,6 +942,7 @@ function renderLinks() {
     nav.appendChild(a);
   });
   nav.hidden = !(S.links && S.links.some(l => l.url));
+  applyIconSize();
 }
 
 /* ============================ settings panel ============================ */
@@ -1000,7 +1017,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-claudeTarget", S.claudeTarget);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
@@ -1051,6 +1068,7 @@ function bindControls() {
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
   $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
+  $("s-iconSize").onchange = () => { S.iconSize = $("s-iconSize").value; save(); applyIconSize(); };
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
   $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };
 

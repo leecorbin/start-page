@@ -40,7 +40,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   via [Iconify Simple Icons](https://simpleicons.org), falling back to the
   DuckDuckGo favicon then a letter monogram, with an optional per-item
   **emoji/symbol override** (⌃⌘Space). Quick links also have styled **hover
-  tooltips** and **reorderable** rows in a small inline editor.
+  tooltips**, **reorderable** rows, and a **Small / Medium / Large** icon-size
+  option (handy for wide wordmark logos).
 - 💾 **Export / import settings** — back up your whole config (and favourites) to a
   JSON file and restore it on another machine.
 - 🌗 **Dynamic contrast** — samples the background's brightness and flips text/icons

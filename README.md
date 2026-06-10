@@ -58,6 +58,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   greeting (12/24h, optional seconds).
 - ⚡️ **Instant images** — the *next* photo is prefetched during idle, so opening a
   new tab paints a fresh photo with no wait (after the first load).
+- ⭐ **Frequent sites** — an optional second row that auto-surfaces the sites you
+  visit most (above a min-visits threshold, excluding ones you've already pinned),
+  with the same brand icons; hover an icon and tap × to forget it.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

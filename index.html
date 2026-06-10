@@ -67,7 +67,7 @@
   #weather svg { width: 18px; height: 18px; }
   .wx-sep { opacity: 0.5; }
 
-  form { margin-top: 2.2rem; width: min(620px, 88vw); display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
+  form { position: relative; z-index: 5; margin-top: 2.2rem; width: min(620px, 88vw); display: flex; flex-direction: column; align-items: center; gap: 0.8rem; }
   form[hidden] { display: none; }
   .field {
     position: relative;
@@ -122,6 +122,16 @@
   #links.size-large .ql-mono { width: 42px; height: 42px; font-size: 19px; }
   #links.size-large .ql-glyph { font-size: 36px; }
 
+  #frequent { margin-top: 1.0rem; display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
+  #frequent[hidden] { display: none; }
+  .freq-item { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; text-decoration: none; opacity: 0.62; transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease; }
+  .freq-item:hover { opacity: 1; background: rgba(255,255,255,0.08); transform: translateY(-2px); }
+  .freq-item img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
+  .freq-item .ql-mono { width: 20px; height: 20px; font-size: 10px; }
+  .freq-item:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .freq-del { position: absolute; top: -5px; right: -5px; width: 15px; height: 15px; padding: 0; border: none; border-radius: 50%; background: rgba(18,22,30,0.95); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: none; place-items: center; }
+  .freq-item:hover .freq-del { display: grid; }
+  .freq-del:hover { background: #d9534f; }
   #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
   #credit.show { opacity: 1; }
   #credit a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
@@ -245,6 +255,7 @@
     </form>
 
     <nav id="links" aria-label="Quick links" hidden></nav>
+    <nav id="frequent" aria-label="Frequent sites" hidden></nav>
   </div>
 
   <div id="credit"></div>
@@ -341,6 +352,12 @@
         <div id="bang-editor"></div>
         <button class="minibtn" id="bang-add" style="width:100%;margin-top:0.2rem;">+ Add search</button>
       </div>
+      <div class="group">
+        <label class="h">Frequent sites</label>
+        <div class="row"><span>Show frequent row</span><input id="s-showFrequent" type="checkbox" /></div>
+        <div class="row"><span>Min visits</span><select id="s-freqMin"><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></div>
+        <p class="grp-note">Auto-surfaced from sites you visit a lot (and haven't pinned above). Hover an icon and tap × to forget it.</p>
+      </div>
     </div>
   </aside>
 
@@ -358,7 +375,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small",
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small", showFrequent: true, freqMinVisits: 3,
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -1054,6 +1071,29 @@ function applyIconSize() {
   el.classList.remove("size-small", "size-medium", "size-large");
   el.classList.add("size-" + (S.iconSize || "small"));
 }
+function forgetHost(host) {
+  const h = readLS(K.hist) || [];
+  writeLS(K.hist, h.filter(x => (x.host || "") !== host));
+}
+function renderFrequent() {
+  const nav = $("frequent"); if (!nav) return; nav.innerHTML = "";
+  if (!S.showFrequent) { nav.hidden = true; return; }
+  const hosts = {};
+  for (const e of (readLS(K.hist) || [])) { if (!e.host) continue; const h = (hosts[e.host] = hosts[e.host] || { host: e.host, n: 0, t: 0 }); h.n += e.n; h.t = Math.max(h.t, e.t); }
+  const pinned = new Set((S.links || []).map(l => hostOf(l.url)));
+  const min = S.freqMinVisits || 3;
+  const list = Object.values(hosts).filter(x => x.n >= min && !pinned.has(x.host)).sort((a, b) => (b.n - a.n) || (b.t - a.t)).slice(0, 8);
+  list.forEach(x => {
+    const a = document.createElement("a"); a.href = "https://" + x.host; a.className = "freq-item"; a.setAttribute("aria-label", x.host);
+    a.appendChild(makeGlyph({ url: "https://" + x.host }));
+    const tip = document.createElement("span"); tip.className = "ql-tip"; tip.textContent = x.host; a.appendChild(tip);
+    const del = document.createElement("button"); del.className = "freq-del"; del.textContent = "×"; del.title = "Forget this site";
+    del.onclick = (e) => { e.preventDefault(); e.stopPropagation(); forgetHost(x.host); renderFrequent(); };
+    a.appendChild(del);
+    nav.appendChild(a);
+  });
+  nav.hidden = !list.length;
+}
 function renderLinks() {
   const nav = $("links"); nav.innerHTML = "";
   (S.links || []).filter(l => l.url).forEach(l => {
@@ -1065,6 +1105,7 @@ function renderLinks() {
   });
   nav.hidden = !(S.links && S.links.some(l => l.url));
   applyIconSize();
+  renderFrequent();
 }
 
 /* ============================ settings panel ============================ */
@@ -1139,7 +1180,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize); set("s-showFrequent", S.showFrequent); set("s-freqMin", S.freqMinVisits);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
@@ -1191,7 +1232,9 @@ function bindControls() {
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
   $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
   $("s-siteHistory").onchange = () => { S.siteHistory = $("s-siteHistory").checked; save(); };
-  $("s-clearHistory").onclick = () => { localStorage.removeItem(K.hist); const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); };
+  $("s-clearHistory").onclick = () => { localStorage.removeItem(K.hist); const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); renderFrequent(); };
+  $("s-showFrequent").onchange = () => { S.showFrequent = $("s-showFrequent").checked; save(); renderFrequent(); };
+  $("s-freqMin").onchange = () => { S.freqMinVisits = +$("s-freqMin").value; save(); renderFrequent(); };
   $("s-iconSize").onchange = () => { S.iconSize = $("s-iconSize").value; save(); applyIconSize(); };
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
   $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };

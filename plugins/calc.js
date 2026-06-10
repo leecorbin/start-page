@@ -284,7 +284,9 @@ function analyze(text) {
   }
   const ast = parse(tokenize(t));
   const fv = freeVars(ast);
-  if (fv.size === 1 && fv.has("x")) return { kind: "graph", ast };
+  // A real expression in an unset x graphs implicitly; a lone "x" doesn't
+  // (you're probably mid-way through typing "x = 5"). y= always graphs.
+  if (fv.size === 1 && fv.has("x") && ast.t !== "var") return { kind: "graph", ast };
   if (fv.size) throw new Error(fv.values().next().value + " is not defined");
   return { kind: "value", ast, val: eval_(ast, envBase()) };
 }
@@ -301,9 +303,16 @@ function buildGraph(ast) {
   }
   const ys = pts.map((p) => p[1]).filter((v) => !isNaN(v)).sort((a, b) => a - b);
   if (!ys.length) throw new Error("nothing to plot");
+  const fullLo = ys[0], fullHi = ys[ys.length - 1];
   let lo = ys[Math.floor(ys.length * 0.04)], hi = ys[Math.ceil(ys.length * 0.96) - 1];
+  // True range for smooth functions; percentile range only to tame asymptotes.
+  if (!(hi > lo) || fullHi - fullLo <= 3 * (hi - lo)) { lo = fullLo; hi = fullHi; }
   if (!(hi > lo)) { lo -= 1; hi += 1; }
-  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  // Round the bounds outward to a "nice" step so the labels aren't arbitrary.
+  const niceStep = (raw) => { const mag = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / mag; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag; };
+  const step = niceStep((hi - lo) / 12);
+  lo = Math.floor(lo / step + 1e-9) * step;
+  hi = Math.ceil(hi / step - 1e-9) * step;
   const px = (x) => GP + ((x - XMIN) / (XMAX - XMIN)) * (GW - 2 * GP);
   const py = (y) => GH - GP - ((y - lo) / (hi - lo)) * (GH - 2 * GP);
   const span = hi - lo, limHi = hi + span, limLo = lo - span;

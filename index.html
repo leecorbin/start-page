@@ -17,8 +17,10 @@
   :root {
     --fg: #f4f6fb;
     --muted: rgba(244, 246, 251, 0.62);
-    --field-bg: rgba(16, 20, 28, 0.68);
-    --field-bg-focus: rgba(22, 27, 37, 0.72);
+    --field-bg: rgba(255, 255, 255, 0.15);
+    --field-bg-focus: rgba(255, 255, 255, 0.22);
+    --field-dark: rgba(16, 20, 28, 0.68);
+    --field-dark-focus: rgba(22, 27, 37, 0.72);
     --field-border: rgba(255, 255, 255, 0.22);
     --accent: #5b9bff;
     --panel-bg: rgba(20, 24, 32, 0.84);
@@ -78,6 +80,11 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .field:focus-within { background: var(--field-bg-focus); }   /* search is the default — no accent border; modes (below) colour it */
+  /* Adaptive glass: light & elegant by default; turns dark only when the photo behind is light (for readability). Plugins force dark. */
+  body.lc-light .field { background: var(--field-dark); }
+  body.lc-light .field:focus-within { background: var(--field-dark-focus); }
+  .field.mode-plugin { background: var(--field-dark); }
+  .field.mode-plugin:focus-within { background: var(--field-dark-focus); }
   .field svg { flex: none; width: 20px; height: 20px; opacity: 0.6; }
   .field .ic-globe { display: none; }
   .field.mode-url .ic-search { display: none; }
@@ -199,7 +206,7 @@
   /* plugin panel — the omnibox slides open to host a lazy-loaded plugin */
   #plugin-panel { width: 100%; height: 0; margin-top: -0.8rem; overflow: hidden; transition: height 0.32s cubic-bezier(0.4,0,0.2,1), margin-top 0.32s cubic-bezier(0.4,0,0.2,1); }
   #plugin-panel.open { margin-top: 0; }
-  .pp-card { height: 100%; position: relative; background: var(--field-bg); border: 1px solid var(--field-border); border-radius: 14px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 6px 28px rgba(0,0,0,0.28); }
+  .pp-card { height: 100%; position: relative; background: var(--field-dark); border: 1px solid var(--field-border); border-radius: 14px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 6px 28px rgba(0,0,0,0.28); }
   .pp-spin { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; border: 2px solid rgba(255,255,255,0.18); border-top-color: rgba(255,255,255,0.7); border-radius: 50%; display: none; animation: ppspin 0.8s linear infinite; }
   #plugin-panel.loading .pp-spin { display: block; }
   .pp-content { height: 100%; opacity: 0; transition: opacity 0.35s ease; }
@@ -1017,13 +1024,20 @@ function emptyState(provider) {
   creditEl.textContent = provider === "favourites" ? "No favourites yet — tap ☆ on a photo" : "Add image filenames in settings";
   creditEl.classList.add("show");
 }
+function solidLuminance(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return 0;
+  const n = parseInt(m[1], 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+}
 async function refreshBackground(force) {
   const b = S.bg;
   creditEl.classList.remove("show");
   if (b.provider === "solid") {
     bgEl.classList.remove("loaded"); bgEl.style.backgroundImage = "none";
     document.body.style.background = b.solid;
-    document.body.classList.remove("lc-light", "bl-light", "br-light");
+    const sl = solidLuminance(b.solid) > 150;   // a light solid → adapt to dark glass too
+    ["lc-light", "bl-light", "br-light"].forEach((c) => document.body.classList.toggle(c, sl));
     $("controls").classList.add("no-image"); CURRENT = null;
     return;
   }

@@ -546,6 +546,18 @@ function tryComplete() {
     input.setSelectionRange(v.length, m.length);   // suffix selected: type to replace, Return to go, Esc to clear
   }
 }
+function forgetCurrent() {
+  const v = input.value, s = input.selectionStart, e = input.selectionEnd;
+  if (!(s < e && e === v.length && s > 0)) return false;     // only when a completion is showing
+  const target = v.toLowerCase();
+  let h = readLS(K.hist) || [];
+  if (v.indexOf("/") === -1) h = h.filter(x => (x.host || "").toLowerCase() !== target);  // bare domain → forget the whole site
+  else h = h.filter(x => (x.key || "").toLowerCase() !== target);                         // path → forget just that URL
+  writeLS(K.hist, h);
+  input.value = v.slice(0, s);   // restore what you typed, then offer the next match
+  tryComplete();
+  return true;
+}
 
 const field = document.querySelector(".field");
 
@@ -584,15 +596,23 @@ input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
     if (e.key === "Enter" && sug.idx >= 0) { e.preventDefault(); chooseSuggest(sug.items[sug.idx]); return; }
   }
-  if ((e.key === "Tab" || e.key === "/") && S.siteHistory) {                        // accept the completion + add a slash, ready to type a path
-    const v = input.value;
-    if (input.selectionStart < input.selectionEnd && input.selectionEnd === v.length && input.selectionStart > 0) {
+  if ((e.key === "Tab" || e.key === "/") && S.siteHistory) {                        // step through a completed path one slash at a time
+    const v = input.value, s = input.selectionStart;
+    if (s < input.selectionEnd && input.selectionEnd === v.length && s > 0) {       // a completion suffix is selected
       e.preventDefault();
-      input.value = v.endsWith("/") ? v : v + "/";
-      input.setSelectionRange(input.value.length, input.value.length);
-      tryComplete();   // offer the most-used path under this domain
+      const slash = v.indexOf("/", s);
+      if (slash >= 0) {
+        input.setSelectionRange(slash + 1, v.length);                              // commit this segment, keep the rest selected
+      } else {
+        input.value = v.endsWith("/") ? v : v + "/";                               // no more slashes → add one and offer the next path
+        input.setSelectionRange(input.value.length, input.value.length);
+        tryComplete();
+      }
       return;
     }
+  }
+  if ((e.key === "Backspace" || e.key === "Delete") && e.shiftKey) {                // ⇧⌫ → forget the site/URL being autocompleted
+    if (forgetCurrent()) { e.preventDefault(); return; }
   }
   if (e.key === "Escape" && !sug.open && input.value) {                            // Esc: drop the completion suffix, then clear the box
     e.preventDefault(); e.stopPropagation();
@@ -679,7 +699,8 @@ function openHelp() {
        <tr><td><kbd>⌘↵</kbd></td><td>Ask Claude</td></tr>
        <tr><td><kbd>⌘L</kbd></td><td>Safari address bar (history &amp; autocomplete)</td></tr>
        <tr><td><kbd>⌘/</kbd></td><td>This help</td></tr>
-       <tr><td><kbd>tab</kbd> <kbd>/</kbd></td><td>Accept the completed domain + add /, ready for a path</td></tr>
+       <tr><td><kbd>tab</kbd> <kbd>/</kbd></td><td>Step through a completed path one slash at a time</td></tr>
+       <tr><td><kbd>⇧⌫</kbd></td><td>Forget the site/URL being autocompleted</td></tr>
        <tr><td><kbd>esc</kbd></td><td>Dismiss autocomplete / clear the box</td></tr>
      </table>
      ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;

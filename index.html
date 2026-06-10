@@ -185,8 +185,11 @@
   /* suggestions dropdown */
   .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 6; background: rgba(20,24,32,0.94); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
   .suggest[hidden] { display: none; }
-  .sug-row { padding: 0.55rem 1rem; font-size: 1rem; color: var(--fg); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sug-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.95rem; font-size: 0.98rem; color: var(--fg); cursor: pointer; }
   .sug-row:hover, .sug-row.active { background: rgba(255,255,255,0.12); }
+  .sug-ic { flex: none; width: 16px; height: 16px; display: grid; place-items: center; opacity: 0.45; }
+  .sug-ic svg { width: 16px; height: 16px; }
+  .sug-tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .sub-note { color: var(--muted); font-size: 0.78em; }
 
   /* help / info modal */
@@ -634,18 +637,41 @@ input.addEventListener("keydown", (e) => {
   goSearch();
 });
 
-/* ---- web suggestions (Google, opt-in) ---- */
+/* ---- suggestions dropdown: your visited sites + (opt-in) Google web suggestions ---- */
 const suggestEl = $("suggest");
+const SUGGEST_MIN = 3;   // don't surface the dropdown until a few chars are typed (tweak to taste)
+const ICON_GLOBE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>`;
+const ICON_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
 let sug = { items: [], idx: -1, open: false };
 let sugTimer = null, sugSeq = 0, sugScript = null;
+
+function typedPrefix() {   // what you actually typed, ignoring any selected inline-completion suffix
+  const sel = input.selectionStart < input.selectionEnd && input.selectionEnd === input.value.length;
+  return (sel ? input.value.slice(0, input.selectionStart) : input.value).trim();
+}
+function histMatches(prefix, limit) {
+  const p = prefix.toLowerCase().replace(/^www\./, "");
+  if (!p) return [];
+  const entries = readLS(K.hist) || [], out = [], seen = new Set();
+  if (p.indexOf("/") === -1) {   // bare domain(s) first (domain-first)
+    const hosts = {};
+    for (const e of entries) { if (!e.host) continue; const h = (hosts[e.host] = hosts[e.host] || { host: e.host, n: 0, t: 0 }); h.n += e.n; h.t = Math.max(h.t, e.t); }
+    Object.values(hosts).filter(x => x.host.startsWith(p)).sort((a, b) => (b.n - a.n) || (b.t - a.t)).forEach(x => { if (!seen.has(x.host)) { seen.add(x.host); out.push(x.host); } });
+  }
+  entries.filter(e => e.key && e.key.toLowerCase().startsWith(p)).sort((a, b) => (b.n - a.n) || (b.t - a.t)).forEach(e => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e.key); } });
+  return out.slice(0, limit || 6);
+}
 function closeSuggest() { suggestEl.hidden = true; suggestEl.innerHTML = ""; sug.open = false; sug.idx = -1; sug.items = []; }
 function renderSuggest(items) {
-  items = (items || []).slice(0, 6);
+  items = (items || []).slice(0, 8);
   sug.items = items; sug.idx = -1; suggestEl.innerHTML = "";
   if (!items.length) { closeSuggest(); return; }
-  items.forEach((s) => {
-    const row = document.createElement("div"); row.className = "sug-row"; row.textContent = s;
-    row.onmousedown = (e) => { e.preventDefault(); chooseSuggest(s); };
+  items.forEach((it) => {
+    const row = document.createElement("div"); row.className = "sug-row";
+    const ic = document.createElement("span"); ic.className = "sug-ic"; ic.innerHTML = it.type === "site" ? ICON_GLOBE : ICON_SEARCH;
+    const tx = document.createElement("span"); tx.className = "sug-tx"; tx.textContent = it.text;
+    row.append(ic, tx);
+    row.onmousedown = (e) => { e.preventDefault(); chooseSuggest(it); };
     suggestEl.appendChild(row);
   });
   suggestEl.hidden = false; sug.open = true;
@@ -655,9 +681,9 @@ function highlight(n) {
   if (!rows.length) return;
   sug.idx = (n + rows.length) % rows.length;
   rows.forEach((r, i) => r.classList.toggle("active", i === sug.idx));
-  input.value = sug.items[sug.idx];
+  input.value = sug.items[sug.idx].text;
 }
-function chooseSuggest(s) { input.value = s; closeSuggest(); goSearch(); }
+function chooseSuggest(it) { closeSuggest(); input.value = it.text; it.type === "site" ? goUrl(it.text, false) : goSearch(); }
 function fetchSuggest(q, cb) {
   const id = "__sug" + (++sugSeq);
   const cleanup = () => { try { delete window[id]; } catch {} if (sugScript) { sugScript.remove(); sugScript = null; } };
@@ -669,11 +695,17 @@ function fetchSuggest(q, cb) {
   document.head.appendChild(sugScript);
 }
 function maybeSuggest() {
-  if (!S.webSuggest || activeBang) { closeSuggest(); return; }
-  const q = input.value.trim();
-  if (!q || q.startsWith("/") || (S.smartUrl && looksLikeUrl(q))) { closeSuggest(); return; }
   clearTimeout(sugTimer);
-  sugTimer = setTimeout(() => fetchSuggest(q, renderSuggest), 130);
+  const q = typedPrefix();
+  if (activeBang || q.length < SUGGEST_MIN || q.startsWith("/")) { closeSuggest(); return; }
+  const siteItems = (S.siteHistory && !/\s/.test(q)) ? histMatches(q, 5).map(t => ({ type: "site", text: t })) : [];
+  renderSuggest(siteItems);   // local matches show instantly
+  if (S.webSuggest && !(S.smartUrl && looksLikeUrl(q))) {
+    sugTimer = setTimeout(() => fetchSuggest(q, web => {
+      if (typedPrefix() !== q) return;   // stale — you've typed more
+      renderSuggest(siteItems.concat(web.slice(0, 6).map(s => ({ type: "search", text: s }))));
+    }), 140);
+  }
 }
 input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 

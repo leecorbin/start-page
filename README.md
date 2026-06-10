@@ -32,8 +32,10 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     and inline-completed next time. Domain-first while you type the host
     (`cloz…`→`clozesure.com`); then **`Tab` / `/`** steps through the path one
     slash at a time, offering your most-used path at each level. `Return` to go,
-    `Esc` to clear, **`⇧⌫`** to forget the current site/URL. Private to your
-    browser; toggle it, or wipe it all, in settings.
+    `Esc` to clear, **`⇧⌫`** to forget the current site/URL. After a few characters
+    a dropdown also lists your *other* matching sites (`↓` to pick) — merged with
+    web suggestions when those are on. Private to your browser; toggle it, or wipe
+    it all, in settings.
 - 🖼️ **Background of the day** from keyless providers, with photographer credit:
   - **Photos (Picsum)** — [Lorem Picsum](https://picsum.photos), no API key, images from Unsplash
   - **Favourites** — ⭐ any photo (stored by id, no files needed) and cycle through them

@@ -65,8 +65,10 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always
-  returns to the normal omnibox. Plugins live in `plugins/*.js` and are only
-  downloaded on first use, so the core page stays instant.
+  returns to the normal omnibox. `⌘/` inside a plugin opens **its own help page**,
+  and each plugin can be toggled on/off in Settings → Shortcuts. Plugins live in
+  `plugins/*.js` and are only downloaded on first use, so the core page stays
+  instant.
   - 🧮 **Calculator** (`==`) — a safe, no-`eval` expression engine with **exact
     fractions** (`1/3 + 1/6` → ½ = 0.5), pretty-rendered maths (stacked
     fractions, superscript exponents, radical signs), `%`/`of`, factorials,

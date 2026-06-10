@@ -258,8 +258,35 @@ function errMsg(e) {
   return "…";
 }
 
+const HELP = `
+<p>Type expressions straight into the search box — the result renders live below,
+and exact fractions stay exact (<em>1/3 + 1/6</em> gives ½, with the decimal alongside).</p>
+<h3>Operators</h3>
+<table class="help-keys">
+  <tr><td><kbd>+ − × ÷</kbd></td><td>arithmetic (<kbd>*</kbd> and <kbd>/</kbd> work too)</td></tr>
+  <tr><td><kbd>^</kbd></td><td>powers — 2^10</td></tr>
+  <tr><td><kbd>%</kbd></td><td>percent — 15% of 240</td></tr>
+  <tr><td><kbd>!</kbd></td><td>factorial — 5!</td></tr>
+  <tr><td><kbd>( )</kbd></td><td>grouping; implicit multiply works — 2π, 2(3+4)</td></tr>
+</table>
+<h3>Functions &amp; constants</h3>
+<table class="help-keys">
+  <tr><td><kbd>sqrt abs</kbd></td><td>√ works too — sqrt(2)</td></tr>
+  <tr><td><kbd>sin cos tan</kbd></td><td>radians; asin, acos, atan</td></tr>
+  <tr><td><kbd>ln log exp</kbd></td><td>natural log, log₁₀, eˣ</td></tr>
+  <tr><td><kbd>floor ceil round</kbd></td><td>rounding</td></tr>
+  <tr><td><kbd>π e ans</kbd></td><td>constants — ans is the last tape result</td></tr>
+</table>
+<h3>Tape</h3>
+<table class="help-keys">
+  <tr><td><kbd>↵</kbd></td><td>commit the expression to the tape</td></tr>
+  <tr><td><kbd>click</kbd></td><td>copy a result</td></tr>
+  <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
+</table>`;
+
 const plugin = {
   hints: [["↵", "add to tape"], ["ans", "last result"], ["click", "copy result"]],
+  help: HELP,
   mount(root, hostApi) {
     api = hostApi;
     styleEl = document.createElement("style");

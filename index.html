@@ -374,6 +374,11 @@
         <div class="row"><span>Min visits</span><select id="s-freqMin"><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></div>
         <p class="grp-note">Auto-surfaced from sites you visit a lot (and haven't pinned above). Hover an icon and tap × to forget it.</p>
       </div>
+      <div class="group">
+        <label class="h">Plugins</label>
+        <div id="plugin-toggles"></div>
+        <p class="grp-note">Typed triggers that open mini-apps in the search box. Press <kbd>⌘/</kbd> inside a plugin for its own help.</p>
+      </div>
     </div>
   </aside>
 
@@ -391,7 +396,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small", showFrequent: true, freqMinVisits: 3,
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small", showFrequent: true, freqMinVisits: 3, disabledPlugins: [],
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -619,7 +624,7 @@ function updateMode() {
 input.addEventListener("input", (e) => {
   if (activePlugin) { if (activePlugin.mod && activePlugin.mod.onInput) activePlugin.mod.onInput(input.value); return; }
   if (!activeBang) {
-    for (const def of PLUGINS) if (input.value.startsWith(def.trigger)) { openPlugin(def, input.value.slice(def.trigger.length)); return; }
+    for (const def of PLUGINS) if (!(S.disabledPlugins || []).includes(def.id) && input.value.startsWith(def.trigger)) { openPlugin(def, input.value.slice(def.trigger.length)); return; }
     const m = input.value.match(/^(\S+)\s(.*)$/);
     if (m) { const b = bangByKeyword(m[1]); if (b) { setBang(b); input.value = m[2]; } }
   }
@@ -629,7 +634,7 @@ input.addEventListener("input", (e) => {
 });
 input.addEventListener("keydown", (e) => {
   if (activePlugin) {
-    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePlugin(); return; }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (!$("help").hidden) closeHelp(); else closePlugin(); return; }
     if (e.key === "Backspace" && input.value === "") { e.preventDefault(); closePlugin(); return; }
     if (e.key === "Enter") { e.preventDefault(); if (activePlugin.mod && activePlugin.mod.onEnter) activePlugin.mod.onEnter(input.value); return; }
     return;   // everything else types into the plugin's input as normal
@@ -757,7 +762,7 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
    Module contract: export default { hints, mount(root, api), onInput(text),
    onEnter(text), unmount() } — api: { setInput, getInput, setHeight, close }. */
 const PLUGINS = [
-  { trigger: "==", title: "Calculator", icon: "=", height: 210, src: "./plugins/calc.js" },
+  { id: "calc", trigger: "==", title: "Calculator", icon: "=", height: 210, src: "./plugins/calc.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");
@@ -797,7 +802,7 @@ async function openPlugin(def, initial) {
     mod.mount(pluginContent, api);
     pluginPanel.classList.remove("loading");
     pluginContent.classList.add("show");
-    setPluginHints(mod.hints);
+    setPluginHints((mod.hints || []).concat(mod.help ? [["⌘/", "help"]] : []));
     if (mod.onInput) mod.onInput(input.value);
   } catch (err) {
     if (!activePlugin || activePlugin.gen !== gen) return;
@@ -824,6 +829,11 @@ function closePlugin() {
 
 /* ---- help / info popup (⌘/) ---- */
 function openHelp() {
+  if (activePlugin && activePlugin.mod && activePlugin.mod.help) {   // plugin's own help page
+    $("help-body").innerHTML = `<h2>${activePlugin.def.title}</h2>` + activePlugin.mod.help;
+    $("help").hidden = false;
+    return;
+  }
   const bangs = (S.bangs || []).filter(b => b.keyword).map(b =>
     `<tr><td><kbd>${b.keyword}</kbd></td><td>${b.name || b.keyword}</td></tr>`).join("");
   $("help-body").innerHTML =
@@ -847,7 +857,7 @@ function openHelp() {
        <tr><td><kbd>tab</kbd> <kbd>/</kbd></td><td>Step through a completed path one slash at a time</td></tr>
        <tr><td><kbd>⇧⌫</kbd></td><td>Forget the site/URL being autocompleted</td></tr>
        <tr><td><kbd>esc</kbd></td><td>Dismiss autocomplete / clear the box</td></tr>
-       ${PLUGINS.map(p => `<tr><td><kbd>${p.trigger}</kbd></td><td>Open ${p.title}</td></tr>`).join("")}
+       ${PLUGINS.filter(p => !(S.disabledPlugins || []).includes(p.id)).map(p => `<tr><td><kbd>${p.trigger}</kbd></td><td>Open ${p.title}</td></tr>`).join("")}
      </table>
      ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;
   $("help").hidden = false;
@@ -1269,6 +1279,27 @@ function renderBangEditor() {
   });
 }
 
+function renderPluginToggles() {
+  const wrap = $("plugin-toggles"); if (!wrap) return; wrap.innerHTML = "";
+  PLUGINS.forEach((def) => {
+    const row = document.createElement("div"); row.className = "row";
+    const label = document.createElement("span");
+    label.innerHTML = `${def.title} <code>${def.trigger}</code>`;
+    const cb = document.createElement("input"); cb.type = "checkbox";
+    cb.checked = !(S.disabledPlugins || []).includes(def.id);
+    cb.onchange = () => {
+      S.disabledPlugins = (S.disabledPlugins || []).filter((x) => x !== def.id);
+      if (!cb.checked) {
+        S.disabledPlugins.push(def.id);
+        if (activePlugin && activePlugin.def.id === def.id) closePlugin();
+      }
+      save();
+    };
+    row.append(label, cb);
+    wrap.appendChild(row);
+  });
+}
+
 function bindControls() {
   const set = (id, v) => { const el = $(id); el.type === "checkbox" ? (el.checked = v) : (el.value = v); };
   set("s-provider", S.bg.provider); set("s-frequency", S.bg.frequency);
@@ -1283,6 +1314,7 @@ function bindControls() {
   syncDataWhen();
   renderLinkEditor();
   renderBangEditor();
+  renderPluginToggles();
   if (S.weather.place) wxStatus("✓ " + S.weather.place);
 
   const live = () => { applyBgStyle(); if (lastImg) analyzeContrast(lastImg); };

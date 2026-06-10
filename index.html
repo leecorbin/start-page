@@ -308,6 +308,8 @@
       <div class="row"><span>Focus box on load</span><input id="s-autofocus" type="checkbox" /></div>
       <div class="row"><span>Smart address detection</span><input id="s-smartUrl" type="checkbox" /></div>
       <div class="row"><span>Web suggestions <span class="sub-note">· sends typing to Google</span></span><input id="s-webSuggest" type="checkbox" /></div>
+      <div class="row"><span>Autocomplete visited sites</span><input id="s-siteHistory" type="checkbox" /></div>
+      <div class="row"><span class="sub-note">Remembered locally, in this browser only</span><button class="minibtn" id="s-clearHistory" style="padding:0.25rem 0.5rem;font-size:0.78rem;">Clear</button></div>
       <div class="row"><span>Ask Claude opens</span><select id="s-claudeTarget"><option value="app">Desktop app</option><option value="web">claude.ai (web)</option></select></div>
     </div>
 
@@ -353,7 +355,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, iconSize: "small",
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small",
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -375,7 +377,7 @@ const DEFAULTS = {
     { keyword: "gmap", name: "Google Maps", url: "https://www.google.com/maps/search/{q}" },
   ],
 };
-const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx" };
+const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx", hist: "startpage:domhist" };
 
 const readLS = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -496,7 +498,39 @@ function toUrl(s, aggressive) {
   if (aggressive && s.indexOf(".") < 0) s += ".com";   // auto-append in explicit URL mode
   return "https://" + s;
 }
-function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (u) window.location.href = u; }
+function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (!u) return; recordHistory(u); window.location.href = u; }
+
+/* ---- private, local autocomplete of sites visited via the box (never leaves the browser) ---- */
+function recordHistory(url) {
+  if (!S.siteHistory) return;
+  let host; try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { return; }
+  if (!host) return;
+  let h = readLS(K.hist) || [];
+  const ex = h.find(x => x.host === host);
+  h = h.filter(x => x.host !== host);
+  h.unshift({ host, n: (ex ? ex.n : 0) + 1, t: Date.now() });
+  if (h.length > 200) h = h.slice(0, 200);
+  writeLS(K.hist, h);
+}
+function histMatch(prefix) {
+  const p = prefix.toLowerCase().replace(/^www\./, "");
+  if (!p) return "";
+  const matches = (readLS(K.hist) || []).filter(x => x.host.toLowerCase().startsWith(p));
+  if (!matches.length) return "";
+  matches.sort((a, b) => (b.n - a.n) || (b.t - a.t));   // most-used, then most-recent
+  return matches[0].host;
+}
+function tryComplete() {
+  if (!S.siteHistory || activeBang) return;
+  const v = input.value;
+  if (!v || /\s/.test(v) || v.startsWith("/")) return;
+  if (input.selectionStart !== v.length || input.selectionEnd !== v.length) return;   // caret at end, nothing selected
+  const m = histMatch(v);
+  if (m && m.length > v.length && m.toLowerCase().startsWith(v.toLowerCase())) {
+    input.value = v + m.slice(v.length);
+    input.setSelectionRange(v.length, m.length);   // suffix selected: type to replace, Return to go, Esc to clear
+  }
+}
 
 const field = document.querySelector(".field");
 
@@ -519,11 +553,12 @@ function updateMode() {
   const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
   field.classList.toggle("mode-url", isUrl);
 }
-input.addEventListener("input", () => {
+input.addEventListener("input", (e) => {
   if (!activeBang) {
     const m = input.value.match(/^(\S+)\s(.*)$/);
     if (m) { const b = bangByKeyword(m[1]); if (b) { setBang(b); input.value = m[2]; } }
   }
+  if (!e || !e.inputType || e.inputType.indexOf("insert") === 0) tryComplete();   // complete on type, not on delete
   updateMode();
   maybeSuggest();
 });
@@ -533,6 +568,13 @@ input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp") { e.preventDefault(); highlight(sug.idx - 1); return; }
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
     if (e.key === "Enter" && sug.idx >= 0) { e.preventDefault(); chooseSuggest(sug.items[sug.idx]); return; }
+  }
+  if (e.key === "Escape" && !sug.open && input.value) {                            // Esc: drop the completion suffix, then clear the box
+    e.preventDefault(); e.stopPropagation();
+    const hasComp = input.selectionStart < input.selectionEnd && input.selectionEnd === input.value.length && input.selectionStart > 0;
+    input.value = hasComp ? input.value.slice(0, input.selectionStart) : "";
+    updateMode(); closeSuggest();
+    return;
   }
   if (e.key === "Backspace" && activeBang && input.value === "") { e.preventDefault(); clearBang(); updateMode(); return; }
   if (e.key !== "Enter") return;
@@ -612,6 +654,7 @@ function openHelp() {
        <tr><td><kbd>⌘↵</kbd></td><td>Ask Claude</td></tr>
        <tr><td><kbd>⌘L</kbd></td><td>Safari address bar (history &amp; autocomplete)</td></tr>
        <tr><td><kbd>⌘/</kbd></td><td>This help</td></tr>
+       <tr><td><kbd>esc</kbd></td><td>Dismiss autocomplete / clear the box</td></tr>
      </table>
      ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;
   $("help").hidden = false;
@@ -1017,7 +1060,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
@@ -1068,6 +1111,8 @@ function bindControls() {
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
   $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
+  $("s-siteHistory").onchange = () => { S.siteHistory = $("s-siteHistory").checked; save(); };
+  $("s-clearHistory").onclick = () => { localStorage.removeItem(K.hist); const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); };
   $("s-iconSize").onchange = () => { S.iconSize = $("s-iconSize").value; save(); applyIconSize(); };
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
   $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };

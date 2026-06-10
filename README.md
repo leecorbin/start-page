@@ -1,7 +1,8 @@
 # start-page
 
-A minimal, **instant** browser start page — a single `index.html` with no build
-step, no tracking, and no API keys. Host it anywhere or just open it locally.
+A minimal, **instant** browser start page — a single `index.html` core (plus
+optional lazy-loaded plugins) with no build step, no tracking, and no API keys.
+Host it anywhere or just open it locally.
 Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 
 ![start-page running as a Safari new-tab page](screenshot.png)
@@ -61,6 +62,16 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - ⭐ **Frequent sites** — an optional second row that auto-surfaces the sites you
   visit most (above a min-visits threshold, excluding ones you've already pinned),
   with the same brand icons; hover an icon and tap × to forget it.
+- 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
+  trigger and the box expands (spinner while the module fetches, fades in when
+  ready); the plugin's own hints replace the standard ones, and `esc` always
+  returns to the normal omnibox. Plugins live in `plugins/*.js` and are only
+  downloaded on first use, so the core page stays instant.
+  - 🧮 **Calculator** (`==`) — a safe, no-`eval` expression engine with **exact
+    fractions** (`1/3 + 1/6` → ½ = 0.5), pretty-rendered maths (stacked
+    fractions, superscript exponents, radical signs), `%`/`of`, factorials,
+    trig/log (radians), constants `π`/`e`, an `ans` variable, and a tape —
+    click any entry to copy its result.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

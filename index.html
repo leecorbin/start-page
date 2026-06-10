@@ -84,8 +84,11 @@
   .field.mode-url .ic-globe { display: inline; }
   .field.mode-url, .field.mode-url:focus-within { border-color: rgba(120,222,160,0.8); }
   .bang-chip { display: none; align-items: center; gap: 0.32rem; background: rgba(138,180,255,0.20); border: 1px solid rgba(138,180,255,0.42); border-radius: 8px; padding: 0.18rem 0.5rem; margin-right: 0.55rem; font-size: 0.92rem; white-space: nowrap; color: var(--fg); }
-  .field.mode-bang .bang-chip { display: inline-flex; }
+  .field.mode-bang #bang-chip { display: inline-flex; }
   .field.mode-bang .ic-search, .field.mode-bang .ic-globe { display: none; }
+  .field.mode-plugin #plugin-chip { display: inline-flex; }
+  .field.mode-plugin .ic-search, .field.mode-plugin .ic-globe { display: none; }
+  .field.mode-plugin, .field.mode-plugin:focus-within { border-color: rgba(138,180,255,0.55); }
   .bang-chip img { width: 16px; height: 16px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
   .bang-chip .ql-glyph { font-size: 15px; }
   .bang-chip .ql-mono { width: 16px; height: 16px; font-size: 9px; }
@@ -192,6 +195,17 @@
   .reset { margin-top: 0.5rem; width: 100%; background: rgba(255,80,80,0.14); border: 1px solid rgba(255,80,80,0.3); color: #ffb3b3; border-radius: 8px; padding: 0.5rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
   .reset:hover { background: rgba(255,80,80,0.22); }
   .hidden { display: none !important; }
+  /* plugin panel — the omnibox slides open to host a lazy-loaded plugin */
+  #plugin-panel { width: 100%; height: 0; margin-top: -0.8rem; overflow: hidden; transition: height 0.32s cubic-bezier(0.4,0,0.2,1), margin-top 0.32s cubic-bezier(0.4,0,0.2,1); }
+  #plugin-panel.open { margin-top: 0; }
+  .pp-card { height: 100%; position: relative; background: var(--field-bg); border: 1px solid var(--field-border); border-radius: 14px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 6px 28px rgba(0,0,0,0.28); }
+  .pp-spin { position: absolute; inset: 0; margin: auto; width: 22px; height: 22px; border: 2px solid rgba(255,255,255,0.18); border-top-color: rgba(255,255,255,0.7); border-radius: 50%; display: none; animation: ppspin 0.8s linear infinite; }
+  #plugin-panel.loading .pp-spin { display: block; }
+  .pp-content { height: 100%; opacity: 0; transition: opacity 0.35s ease; }
+  .pp-content.show { opacity: 1; }
+  .pp-error { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 0.88rem; padding: 1rem; text-align: center; }
+  @keyframes ppspin { to { transform: rotate(360deg); } }
+
   /* suggestions dropdown */
   .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 6; background: rgba(20,24,32,0.94); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
   .suggest[hidden] { display: none; }
@@ -243,9 +257,11 @@
           <circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"></path>
         </svg>
         <span id="bang-chip" class="bang-chip"></span>
+        <span id="plugin-chip" class="bang-chip"></span>
         <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <div id="suggest" class="suggest" hidden></div>
       </div>
+      <div id="plugin-panel"><div class="pp-card"><div class="pp-spin"></div><div class="pp-content"></div></div></div>
       <div class="hints" id="hints">
         <span class="hk"><kbd>⌥ ↵</kbd> search</span>
         <span class="hk"><kbd>⇧ ↵</kbd> go to site</span>
@@ -595,13 +611,15 @@ function setBang(b) {
 function clearBang() { activeBang = null; field.classList.remove("mode-bang"); }
 
 function updateMode() {
-  if (activeBang) return;   // the bang chip owns the field's look
+  if (activeBang || activePlugin) return;   // the chip owns the field's look
   const t = input.value.trim();
   const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
   field.classList.toggle("mode-url", isUrl);
 }
 input.addEventListener("input", (e) => {
+  if (activePlugin) { if (activePlugin.mod && activePlugin.mod.onInput) activePlugin.mod.onInput(input.value); return; }
   if (!activeBang) {
+    for (const def of PLUGINS) if (input.value.startsWith(def.trigger)) { openPlugin(def, input.value.slice(def.trigger.length)); return; }
     const m = input.value.match(/^(\S+)\s(.*)$/);
     if (m) { const b = bangByKeyword(m[1]); if (b) { setBang(b); input.value = m[2]; } }
   }
@@ -610,6 +628,12 @@ input.addEventListener("input", (e) => {
   maybeSuggest();
 });
 input.addEventListener("keydown", (e) => {
+  if (activePlugin) {
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closePlugin(); return; }
+    if (e.key === "Backspace" && input.value === "") { e.preventDefault(); closePlugin(); return; }
+    if (e.key === "Enter") { e.preventDefault(); if (activePlugin.mod && activePlugin.mod.onEnter) activePlugin.mod.onEnter(input.value); return; }
+    return;   // everything else types into the plugin's input as normal
+  }
   if (sug.open) {
     if (e.key === "ArrowDown") { e.preventDefault(); highlight(sug.idx + 1); return; }
     if (e.key === "ArrowUp") { e.preventDefault(); highlight(sug.idx - 1); return; }
@@ -714,7 +738,7 @@ function fetchSuggest(q, cb) {
 function maybeSuggest() {
   clearTimeout(sugTimer);
   const q = typedPrefix();
-  if (activeBang || q.length < SUGGEST_MIN || q.startsWith("/")) { closeSuggest(); return; }
+  if (activeBang || activePlugin || q.length < SUGGEST_MIN || q.startsWith("/")) { closeSuggest(); return; }
   const siteItems = (S.siteHistory && !/\s/.test(q)) ? histMatches(q, 5).map(t => ({ type: "site", text: t })) : [];
   renderSuggest(siteItems);   // local matches show instantly
   if (S.webSuggest && !(S.smartUrl && looksLikeUrl(q))) {
@@ -725,6 +749,78 @@ function maybeSuggest() {
   }
 }
 input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
+
+/* ---- plugin host: lazy-loaded omnibox plugins ----
+   Type a trigger (e.g. "==") and the omnibox slides open into that plugin.
+   The registry below holds what's needed BEFORE load (trigger, chip, height);
+   the module itself ships in plugins/<name>.js and is fetched on first use.
+   Module contract: export default { hints, mount(root, api), onInput(text),
+   onEnter(text), unmount() } — api: { setInput, getInput, setHeight, close }. */
+const PLUGINS = [
+  { trigger: "==", title: "Calculator", icon: "=", height: 210, src: "./plugins/calc.js" },
+];
+let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
+const pluginPanel = $("plugin-panel");
+const pluginContent = pluginPanel.querySelector(".pp-content");
+
+function setPluginHints(pairs) {
+  const hk = (k, label) => k ? `<span class="hk"><kbd>${k}</kbd> ${label}</span>` : `<span class="hk">${label}</span>`;
+  $("hints").innerHTML = (pairs || []).map(p => hk(p[0], p[1])).join("") + hk("esc", "back");
+}
+async function openPlugin(def, initial) {
+  if (activePlugin) return;
+  const gen = ++pluginGen;
+  activePlugin = { def, mod: null, gen };
+  closeSuggest();
+  const chip = $("plugin-chip");
+  chip.innerHTML = "";
+  chip.appendChild(makeGlyph({ icon: def.icon }));
+  chip.appendChild(document.createTextNode(def.title));
+  field.classList.remove("mode-url");
+  field.classList.add("mode-plugin");
+  input.value = (initial || "").trim();
+  if (savedHintsHTML == null) savedHintsHTML = $("hints").innerHTML;
+  setPluginHints([["", "loading…"]]);
+  pluginPanel.classList.add("loading", "open");
+  pluginPanel.style.height = (def.height || 160) + "px";
+  try {
+    const mod = (await import(def.src)).default;
+    if (!activePlugin || activePlugin.gen !== gen) return;   // closed while loading
+    activePlugin.mod = mod;
+    const api = {
+      setInput: (v) => { input.value = v; },
+      getInput: () => input.value,
+      setHeight: (px) => { pluginPanel.style.height = px + "px"; },
+      close: closePlugin,
+    };
+    pluginContent.innerHTML = "";
+    mod.mount(pluginContent, api);
+    pluginPanel.classList.remove("loading");
+    pluginContent.classList.add("show");
+    setPluginHints(mod.hints);
+    if (mod.onInput) mod.onInput(input.value);
+  } catch (err) {
+    if (!activePlugin || activePlugin.gen !== gen) return;
+    pluginPanel.classList.remove("loading");
+    pluginContent.innerHTML = `<div class="pp-error">Couldn't load ${def.title} — is <code>${def.src}</code> deployed alongside index.html?</div>`;
+    pluginContent.classList.add("show");
+  }
+  input.focus({ preventScroll: true });
+}
+function closePlugin() {
+  if (!activePlugin) return;
+  try { if (activePlugin.mod && activePlugin.mod.unmount) activePlugin.mod.unmount(); } catch {}
+  activePlugin = null; pluginGen++;
+  pluginContent.classList.remove("show");
+  pluginPanel.classList.remove("loading", "open");
+  pluginPanel.style.height = "0px";
+  setTimeout(() => { if (!activePlugin) pluginContent.innerHTML = ""; }, 350);
+  field.classList.remove("mode-plugin");
+  if (savedHintsHTML != null) $("hints").innerHTML = savedHintsHTML;
+  input.value = "";
+  updateMode();
+  input.focus({ preventScroll: true });
+}
 
 /* ---- help / info popup (⌘/) ---- */
 function openHelp() {
@@ -751,6 +847,7 @@ function openHelp() {
        <tr><td><kbd>tab</kbd> <kbd>/</kbd></td><td>Step through a completed path one slash at a time</td></tr>
        <tr><td><kbd>⇧⌫</kbd></td><td>Forget the site/URL being autocompleted</td></tr>
        <tr><td><kbd>esc</kbd></td><td>Dismiss autocomplete / clear the box</td></tr>
+       ${PLUGINS.map(p => `<tr><td><kbd>${p.trigger}</kbd></td><td>Open ${p.title}</td></tr>`).join("")}
      </table>
      ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;
   $("help").hidden = false;

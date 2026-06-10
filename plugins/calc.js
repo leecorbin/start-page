@@ -22,8 +22,11 @@ const CSS = `
 .calcp sup { font-size: 0.7em; }
 .calcp .rt { white-space: nowrap; }
 .calcp .rt .rtv { border-top: 1px solid currentColor; padding: 0 0.18em; }
-.calcp .graph { flex: 1; min-height: 0; padding: 0 0.7rem 0.55rem; }
-.calcp .graph svg { width: 100%; height: auto; display: block; }
+.calcp .graph { flex: 1; min-height: 0; padding: 0 0.7rem 0.55rem; position: relative; }
+.calcp .gwrap svg { width: 100%; height: auto; display: block; }
+.calcp .gzoom { position: absolute; right: 16px; bottom: 12px; display: flex; gap: 4px; }
+.calcp .gz { width: 24px; height: 24px; padding: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.16); background: rgba(20,24,32,0.55); color: rgba(255,255,255,0.65); font: inherit; font-size: 14px; line-height: 1; cursor: pointer; }
+.calcp .gz:hover { background: rgba(255,255,255,0.14); color: #fff; }
 .calcp .tape[hidden], .calcp .graph[hidden] { display: none; }
 .calcp .gax { stroke: rgba(255,255,255,0.22); stroke-width: 1; }
 .calcp .gcurve { stroke: #8ab4ff; stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
@@ -292,11 +295,13 @@ function analyze(text) {
 }
 
 /* ============================ graphing ============================ */
-const XMIN = -10, XMAX = 10, GW = 560, GH = 250, GP = 10;
+let xMin = -10, xMax = 10, lastAst = null;
+const GW = 560, GH = 250, GP = 10;
+const snum = (v) => String(Number(v.toPrecision(3)));
 function buildGraph(ast) {
   const N = 240, pts = [];
   for (let i = 0; i <= N; i++) {
-    const x = XMIN + ((XMAX - XMIN) * i) / N;
+    const x = xMin + ((xMax - xMin) * i) / N;
     let y = NaN;
     try { y = toF(eval_(ast, { ans: ansVal, vars: Object.assign({}, VARS, { x: { f: x } }) })); } catch {}
     pts.push([x, isFinite(y) ? y : NaN]);
@@ -313,7 +318,7 @@ function buildGraph(ast) {
   const step = niceStep((hi - lo) / 12);
   lo = Math.floor(lo / step + 1e-9) * step;
   hi = Math.ceil(hi / step - 1e-9) * step;
-  const px = (x) => GP + ((x - XMIN) / (XMAX - XMIN)) * (GW - 2 * GP);
+  const px = (x) => GP + ((x - xMin) / (xMax - xMin)) * (GW - 2 * GP);
   const py = (y) => GH - GP - ((y - lo) / (hi - lo)) * (GH - 2 * GP);
   const span = hi - lo, limHi = hi + span, limLo = lo - span;
   const segs = []; let cur = [];
@@ -323,21 +328,34 @@ function buildGraph(ast) {
   }
   if (cur.length > 1) segs.push(cur);
   if (!segs.length) throw new Error("nothing to plot");
-  const sn = (v) => String(Number(v.toPrecision(3)));
   let svg = `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">`;
-  if (XMIN <= 0 && 0 <= XMAX) svg += `<line class="gax" x1="${px(0)}" y1="${GP}" x2="${px(0)}" y2="${GH - GP}"/>`;
+  if (xMin <= 0 && 0 <= xMax) svg += `<line class="gax" x1="${px(0)}" y1="${GP}" x2="${px(0)}" y2="${GH - GP}"/>`;
   if (lo <= 0 && 0 <= hi) svg += `<line class="gax" x1="${GP}" y1="${py(0)}" x2="${GW - GP}" y2="${py(0)}"/>`;
   svg += segs.map((s) => `<polyline class="gcurve" points="${s.join(" ")}"/>`).join("");
-  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 4}">${sn(XMIN)}</text>`;
-  svg += `<text class="glabel" x="${GW - GP - 2}" y="${GH - GP - 4}" text-anchor="end">${sn(XMAX)}</text>`;
-  svg += `<text class="glabel" x="${GP + 2}" y="${GP + 10}">${sn(hi)}</text>`;
-  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 16}">${sn(lo)}</text>`;
+  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 4}">${snum(xMin)}</text>`;
+  svg += `<text class="glabel" x="${GW - GP - 2}" y="${GH - GP - 4}" text-anchor="end">${snum(xMax)}</text>`;
+  svg += `<text class="glabel" x="${GP + 2}" y="${GP + 10}">${snum(hi)}</text>`;
+  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 16}">${snum(lo)}</text>`;
   svg += `</svg>`;
   return svg;
 }
 
+function showGraph(ast) {
+  lastAst = ast;
+  gwrapEl.innerHTML = buildGraph(ast);
+  liveEl.innerHTML = `<span class="ex"><em>y</em> = ${rx(ast, 0)}</span><span class="dim">${snum(xMin)} ≤ <em>x</em> ≤ ${snum(xMax)}</span>`;
+}
+function setXSpan(span) {
+  span = Math.min(1e6, Math.max(1e-3, span));
+  const c = (xMin + xMax) / 2;
+  xMin = c - span / 2;
+  xMax = c + span / 2;
+  if (lastAst) showGraph(lastAst);
+}
+const zoomBy = (f) => setXSpan((xMax - xMin) * f);
+
 /* ============================ plugin ============================ */
-let api = null, liveEl = null, tapeEl = null, graphEl = null, styleEl = null;
+let api = null, liveEl = null, tapeEl = null, graphEl = null, gwrapEl = null, styleEl = null;
 let graphMode = false;
 
 function setGraphMode(on) {
@@ -368,7 +386,8 @@ and exact fractions stay exact (<em>1/3 + 1/6</em> gives ½, with the decimal al
 <h3>Variables &amp; graphs</h3>
 <table class="help-keys">
   <tr><td><kbd>x = 5</kbd></td><td>set a variable (↵ to store it), then use it — x^2 + 1</td></tr>
-  <tr><td><kbd>y = x^2 − 3</kbd></td><td>graph it; any expression with an <em>unset</em> x plots too (−10 ≤ x ≤ 10)</td></tr>
+  <tr><td><kbd>y = x^2 − 3</kbd></td><td>graph it; any expression with an <em>unset</em> x plots too (−10 ≤ x ≤ 10 to start)</td></tr>
+  <tr><td><kbd>+ − ⟲</kbd></td><td>zoom the x-window — scrolling or pinching on the graph works too; y auto-fits</td></tr>
 </table>
 <h3>Functions &amp; constants</h3>
 <table class="help-keys">
@@ -393,19 +412,29 @@ const plugin = {
     styleEl = document.createElement("style");
     styleEl.textContent = CSS;
     document.head.appendChild(styleEl);
-    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden></div><div class="tape"></div></div>`;
+    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden><div class="gwrap"></div><div class="gzoom"><button class="gz" title="Zoom in">+</button><button class="gz" title="Zoom out">−</button><button class="gz" title="Reset zoom">⟲</button></div></div><div class="tape"></div></div>`;
     liveEl = root.querySelector(".live");
     tapeEl = root.querySelector(".tape");
     graphEl = root.querySelector(".graph");
+    gwrapEl = root.querySelector(".gwrap");
     graphMode = false;
+    const [zin, zout, zreset] = root.querySelectorAll(".gz");
+    zin.onclick = () => zoomBy(0.5);
+    zout.onclick = () => zoomBy(2);
+    zreset.onclick = () => { xMin = -10; xMax = 10; if (lastAst) showGraph(lastAst); };
+    // scroll wheel zooms; Safari trackpad pinch comes through gesture events
+    graphEl.addEventListener("wheel", (e) => { e.preventDefault(); zoomBy(Math.exp(e.deltaY * 0.0015)); }, { passive: false });
+    let pinchBase = null;
+    graphEl.addEventListener("gesturestart", (e) => { e.preventDefault(); pinchBase = xMax - xMin; });
+    graphEl.addEventListener("gesturechange", (e) => { e.preventDefault(); if (pinchBase && e.scale) setXSpan(pinchBase / e.scale); });
+    graphEl.addEventListener("gestureend", () => { pinchBase = null; });
   },
   onInput(text) {
     if (!text.trim()) { setGraphMode(false); liveEl.innerHTML = PH; return; }
     try {
       const r = analyze(text);
       if (r.kind === "graph") {
-        graphEl.innerHTML = buildGraph(r.ast);
-        liveEl.innerHTML = `<span class="ex"><em>y</em> = ${rx(r.ast, 0)}</span><span class="dim">−10 ≤ <em>x</em> ≤ 10</span>`;
+        showGraph(r.ast);
         setGraphMode(true);
         return;
       }
@@ -443,10 +472,11 @@ const plugin = {
   },
   unmount() {
     if (styleEl) styleEl.remove();
-    api = liveEl = tapeEl = graphEl = null;
+    api = liveEl = tapeEl = graphEl = gwrapEl = null;
     graphMode = false;
     ansVal = { n: 0n, d: 1n };
     VARS = {};
+    xMin = -10; xMax = 10; lastAst = null;
   },
 };
 export default plugin;

@@ -1406,6 +1406,16 @@ renderLinks();
 loadWeather();
 bindControls();
 window.addEventListener("pageshow", assertFocus);
+/* Refocus the box when returning to this tab/window — but never steal focus
+   from another field (e.g. a settings input) the user was working in. */
+function refocusOnReturn() {
+  if (!(S.showSearch && S.autofocus)) return;
+  const a = document.activeElement;
+  if (a && a !== document.body && a !== input) return;
+  input.focus({ preventScroll: true });
+}
+window.addEventListener("focus", refocusOnReturn);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refocusOnReturn(); });
 </script>
 </body>
 </html>

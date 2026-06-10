@@ -28,9 +28,11 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - **Web suggestions** (off by default) — opt-in Google autocomplete with arrow-key
     selection; clearly labelled "sends typing to Google", since no privacy engine
     exposes suggestions to a static page.
-  - **Site autocomplete** — domains you open via the box are remembered *locally*
-    and inline-completed next time (Return to go, keep typing to change, Esc to
-    clear). Private to your browser; toggle or clear it in settings.
+  - **Site autocomplete** — sites you open via the box are remembered *locally*
+    and inline-completed next time. Domain-first while you type the host
+    (`cloz…`→`clozesure.com`), then **`Tab` / `/`** accepts it and offers your
+    most-used path (`/agents`); refine by typing, `Return` to go, `Esc` to clear.
+    Private to your browser; toggle or clear it in settings.
 - 🖼️ **Background of the day** from keyless providers, with photographer credit:
   - **Photos (Picsum)** — [Lorem Picsum](https://picsum.photos), no API key, images from Unsplash
   - **Favourites** — ⭐ any photo (stored by id, no files needed) and cycle through them

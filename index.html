@@ -503,29 +503,44 @@ function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (!u) return; 
 /* ---- private, local autocomplete of sites visited via the box (never leaves the browser) ---- */
 function recordHistory(url) {
   if (!S.siteHistory) return;
-  let host; try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { return; }
+  let u; try { u = new URL(url); } catch { return; }
+  const host = u.hostname.replace(/^www\./, "");
   if (!host) return;
+  let path = u.pathname || "";
+  if (path === "/") path = "";
+  const key = host + path + (u.search || "");     // the exact thing you'd retype (no scheme)
   let h = readLS(K.hist) || [];
-  const ex = h.find(x => x.host === host);
-  h = h.filter(x => x.host !== host);
-  h.unshift({ host, n: (ex ? ex.n : 0) + 1, t: Date.now() });
-  if (h.length > 200) h = h.slice(0, 200);
+  const ex = h.find(x => x.key === key);
+  h = h.filter(x => x.key !== key);
+  h.unshift({ key, host, n: (ex ? ex.n : 0) + 1, t: Date.now() });
+  if (h.length > 300) h = h.slice(0, 300);
   writeLS(K.hist, h);
 }
-function histMatch(prefix) {
-  const p = prefix.toLowerCase().replace(/^www\./, "");
-  if (!p) return "";
-  const matches = (readLS(K.hist) || []).filter(x => x.host.toLowerCase().startsWith(p));
-  if (!matches.length) return "";
-  matches.sort((a, b) => (b.n - a.n) || (b.t - a.t));   // most-used, then most-recent
-  return matches[0].host;
+function completionFor(typed) {
+  const t = typed.toLowerCase().replace(/^www\./, "");
+  if (!t) return "";
+  const entries = readLS(K.hist) || [];
+  if (t.indexOf("/") === -1) {
+    // still typing the host → always complete to the bare domain (domain-first)
+    const hosts = {};
+    for (const e of entries) {
+      if (!e.host) continue;
+      (hosts[e.host] = hosts[e.host] || { host: e.host, n: 0, t: 0 });
+      hosts[e.host].n += e.n; hosts[e.host].t = Math.max(hosts[e.host].t, e.t);
+    }
+    const m = Object.values(hosts).filter(x => x.host.startsWith(t)).sort((a, b) => (b.n - a.n) || (b.t - a.t));
+    return m.length ? m[0].host : "";
+  }
+  // past the slash → complete to the most-used full URL with that prefix
+  const m = entries.filter(e => e.key && e.key.toLowerCase().startsWith(t)).sort((a, b) => (b.n - a.n) || (b.t - a.t));
+  return m.length ? m[0].key : "";
 }
 function tryComplete() {
   if (!S.siteHistory || activeBang) return;
   const v = input.value;
   if (!v || /\s/.test(v) || v.startsWith("/")) return;
   if (input.selectionStart !== v.length || input.selectionEnd !== v.length) return;   // caret at end, nothing selected
-  const m = histMatch(v);
+  const m = completionFor(v);
   if (m && m.length > v.length && m.toLowerCase().startsWith(v.toLowerCase())) {
     input.value = v + m.slice(v.length);
     input.setSelectionRange(v.length, m.length);   // suffix selected: type to replace, Return to go, Esc to clear
@@ -568,6 +583,16 @@ input.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp") { e.preventDefault(); highlight(sug.idx - 1); return; }
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
     if (e.key === "Enter" && sug.idx >= 0) { e.preventDefault(); chooseSuggest(sug.items[sug.idx]); return; }
+  }
+  if ((e.key === "Tab" || e.key === "/") && S.siteHistory) {                        // accept the completion + add a slash, ready to type a path
+    const v = input.value;
+    if (input.selectionStart < input.selectionEnd && input.selectionEnd === v.length && input.selectionStart > 0) {
+      e.preventDefault();
+      input.value = v.endsWith("/") ? v : v + "/";
+      input.setSelectionRange(input.value.length, input.value.length);
+      tryComplete();   // offer the most-used path under this domain
+      return;
+    }
   }
   if (e.key === "Escape" && !sug.open && input.value) {                            // Esc: drop the completion suffix, then clear the box
     e.preventDefault(); e.stopPropagation();
@@ -654,6 +679,7 @@ function openHelp() {
        <tr><td><kbd>⌘↵</kbd></td><td>Ask Claude</td></tr>
        <tr><td><kbd>⌘L</kbd></td><td>Safari address bar (history &amp; autocomplete)</td></tr>
        <tr><td><kbd>⌘/</kbd></td><td>This help</td></tr>
+       <tr><td><kbd>tab</kbd> <kbd>/</kbd></td><td>Accept the completed domain + add /, ready for a path</td></tr>
        <tr><td><kbd>esc</kbd></td><td>Dismiss autocomplete / clear the box</td></tr>
      </table>
      ${bangs ? `<h3>Custom searches</h3><p>Type the key + space, then your query.</p><table class="help-keys">${bangs}</table>` : ""}`;

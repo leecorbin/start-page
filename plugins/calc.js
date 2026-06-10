@@ -1,7 +1,8 @@
 /* start-page plugin: Calculator (trigger "==")
    Safe expression engine — no eval(). Exact fractions via BigInt rationals where
    possible; expressions pretty-rendered with stacked fractions, superscript
-   exponents and radical signs. Part of start-page (MIT). */
+   exponents and radical signs. Variables (x = 5) and graphing (y = x^2, or any
+   expression with an unset x) included. Part of start-page (MIT). */
 
 const CSS = `
 .calcp { height: 100%; display: flex; flex-direction: column; font-size: 1.02rem; color: var(--fg, #f4f6fb); }
@@ -21,9 +22,15 @@ const CSS = `
 .calcp sup { font-size: 0.7em; }
 .calcp .rt { white-space: nowrap; }
 .calcp .rt .rtv { border-top: 1px solid currentColor; padding: 0 0.18em; }
+.calcp .graph { flex: 1; min-height: 0; padding: 0 0.7rem 0.55rem; }
+.calcp .graph svg { width: 100%; height: auto; display: block; }
+.calcp .tape[hidden], .calcp .graph[hidden] { display: none; }
+.calcp .gax { stroke: rgba(255,255,255,0.22); stroke-width: 1; }
+.calcp .gcurve { stroke: #8ab4ff; stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.calcp .glabel { fill: rgba(244,246,251,0.45); font-size: 10px; font-family: ui-monospace, monospace; }
 `;
 
-const PH = `<span class="ph">1/3 + 1/6 &nbsp;·&nbsp; 2^10 &nbsp;·&nbsp; 15% of 240 &nbsp;·&nbsp; sin(π/6) &nbsp;·&nbsp; 5! &nbsp;·&nbsp; ans</span>`;
+const PH = `<span class="ph">1/3 + 1/6 &nbsp;·&nbsp; 2^10 &nbsp;·&nbsp; 15% of 240 &nbsp;·&nbsp; x = 5 &nbsp;·&nbsp; y = x^2 − 3 &nbsp;·&nbsp; ans</span>`;
 
 /* ============================ tokenizer ============================ */
 const FUNCS = {
@@ -90,7 +97,7 @@ function parse(toks) {
         } else node = { t: "call", fn: t.v, a: expr(3) };
       }
       else if (t.v in CONSTS || t.v === "ans") node = { t: "const", name: t.v };
-      else throw new Error("unknown: " + t.v);
+      else node = { t: "var", name: t.v };
     }
     else if (t.k === "(") {
       p++; const a = expr(1);
@@ -153,6 +160,11 @@ function eval_(node, env) {
   switch (node.t) {
     case "num": return node.v.includes(".") ? fromDec(node.v) : rat(BigInt(node.v));
     case "const": return node.name === "ans" ? env.ans : { f: CONSTS[node.name] };
+    case "var": {
+      const v = env.vars && env.vars[node.name];
+      if (!v) throw new Error(node.name + " is not defined");
+      return v;
+    }
     case "group": return eval_(node.a, env);
     case "neg": { const v = eval_(node.a, env); return isRat(v) ? rat(-v.n, v.d) : { f: -v.f }; }
     case "pct": return rDiv(eval_(node.a, env), rat(100n));
@@ -215,6 +227,7 @@ function rx(node, pp) {
   switch (node.t) {
     case "num": return escTxt(node.v);
     case "const": return node.name === "pi" ? "π" : node.name;
+    case "var": return "<em>" + escTxt(node.name) + "</em>";
     case "group": return rx(node.a, pp);
     case "neg": { const h = "−" + rx(node.a, 2.6); return pp > 2 ? "(" + h + ")" : h; }
     case "pct": return rx(node.a, 4) + "%";
@@ -242,19 +255,93 @@ function rx(node, pp) {
   return "?";
 }
 
-/* ============================ plugin ============================ */
-let api = null, liveEl = null, tapeEl = null, styleEl = null;
+/* ============================ analysis: value / assign / graph ============================ */
 let ansVal = { n: 0n, d: 1n };
+let VARS = {};
+const RESERVED = new Set([...Object.keys(FUNCS), "pi", "e", "ans", "y", "of"]);
 
-function compute(text) {
+function freeVars(node, out = new Set()) {
+  if (!node || typeof node !== "object") return out;
+  if (node.t === "var" && !(node.name in VARS)) out.add(node.name);
+  if (node.a) freeVars(node.a, out);
+  if (node.b) freeVars(node.b, out);
+  return out;
+}
+const envBase = () => ({ ans: ansVal, vars: VARS });
+
+function analyze(text) {
   const t = text.trim();
   if (!t) return null;
+  const m = t.match(/^([a-zA-Z]+)\s*=(?!=)\s*(.+)$/);
+  if (m) {
+    const name = m[1].toLowerCase();
+    const ast = parse(tokenize(m[2]));
+    if (name === "y") return { kind: "graph", ast };
+    if (RESERVED.has(name)) throw new Error("“" + name + "” is reserved");
+    const fv = freeVars(ast);
+    if (fv.size) throw new Error(fv.values().next().value + " is not defined");
+    return { kind: "assign", name, ast, val: eval_(ast, envBase()) };
+  }
   const ast = parse(tokenize(t));
-  return { ast, val: eval_(ast, { ans: ansVal }) };
+  const fv = freeVars(ast);
+  if (fv.size === 1 && fv.has("x")) return { kind: "graph", ast };
+  if (fv.size) throw new Error(fv.values().next().value + " is not defined");
+  return { kind: "value", ast, val: eval_(ast, envBase()) };
+}
+
+/* ============================ graphing ============================ */
+const XMIN = -10, XMAX = 10, GW = 560, GH = 250, GP = 10;
+function buildGraph(ast) {
+  const N = 240, pts = [];
+  for (let i = 0; i <= N; i++) {
+    const x = XMIN + ((XMAX - XMIN) * i) / N;
+    let y = NaN;
+    try { y = toF(eval_(ast, { ans: ansVal, vars: Object.assign({}, VARS, { x: { f: x } }) })); } catch {}
+    pts.push([x, isFinite(y) ? y : NaN]);
+  }
+  const ys = pts.map((p) => p[1]).filter((v) => !isNaN(v)).sort((a, b) => a - b);
+  if (!ys.length) throw new Error("nothing to plot");
+  let lo = ys[Math.floor(ys.length * 0.04)], hi = ys[Math.ceil(ys.length * 0.96) - 1];
+  if (!(hi > lo)) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const px = (x) => GP + ((x - XMIN) / (XMAX - XMIN)) * (GW - 2 * GP);
+  const py = (y) => GH - GP - ((y - lo) / (hi - lo)) * (GH - 2 * GP);
+  const span = hi - lo, limHi = hi + span, limLo = lo - span;
+  const segs = []; let cur = [];
+  for (const [x, y] of pts) {
+    if (isNaN(y) || y > limHi || y < limLo) { if (cur.length > 1) segs.push(cur); cur = []; continue; }
+    cur.push(px(x).toFixed(1) + "," + py(y).toFixed(1));
+  }
+  if (cur.length > 1) segs.push(cur);
+  if (!segs.length) throw new Error("nothing to plot");
+  const sn = (v) => String(Number(v.toPrecision(3)));
+  let svg = `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">`;
+  if (XMIN <= 0 && 0 <= XMAX) svg += `<line class="gax" x1="${px(0)}" y1="${GP}" x2="${px(0)}" y2="${GH - GP}"/>`;
+  if (lo <= 0 && 0 <= hi) svg += `<line class="gax" x1="${GP}" y1="${py(0)}" x2="${GW - GP}" y2="${py(0)}"/>`;
+  svg += segs.map((s) => `<polyline class="gcurve" points="${s.join(" ")}"/>`).join("");
+  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 4}">${sn(XMIN)}</text>`;
+  svg += `<text class="glabel" x="${GW - GP - 2}" y="${GH - GP - 4}" text-anchor="end">${sn(XMAX)}</text>`;
+  svg += `<text class="glabel" x="${GP + 2}" y="${GP + 10}">${sn(hi)}</text>`;
+  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 16}">${sn(lo)}</text>`;
+  svg += `</svg>`;
+  return svg;
+}
+
+/* ============================ plugin ============================ */
+let api = null, liveEl = null, tapeEl = null, graphEl = null, styleEl = null;
+let graphMode = false;
+
+function setGraphMode(on) {
+  if (on === graphMode) return;
+  graphMode = on;
+  tapeEl.hidden = on;
+  graphEl.hidden = !on;
+  api.setHeight(on ? 392 : 210);
 }
 function errMsg(e) {
-  if (e && e.message === "div0") return "division by zero";
-  if (e && (e.message === "undefined" || /needs/.test(e.message || ""))) return e.message;
+  const m = (e && e.message) || "";
+  if (m === "div0") return "division by zero";
+  if (m === "undefined" || /needs|defined|reserved|plot/.test(m)) return m;
   return "…";
 }
 
@@ -269,6 +356,11 @@ and exact fractions stay exact (<em>1/3 + 1/6</em> gives ½, with the decimal al
   <tr><td><kbd>!</kbd></td><td>factorial — 5!</td></tr>
   <tr><td><kbd>( )</kbd></td><td>grouping; implicit multiply works — 2π, 2(3+4)</td></tr>
 </table>
+<h3>Variables &amp; graphs</h3>
+<table class="help-keys">
+  <tr><td><kbd>x = 5</kbd></td><td>set a variable (↵ to store it), then use it — x^2 + 1</td></tr>
+  <tr><td><kbd>y = x^2 − 3</kbd></td><td>graph it; any expression with an <em>unset</em> x plots too (−10 ≤ x ≤ 10)</td></tr>
+</table>
 <h3>Functions &amp; constants</h3>
 <table class="help-keys">
   <tr><td><kbd>sqrt abs</kbd></td><td>√ works too — sqrt(2)</td></tr>
@@ -279,42 +371,55 @@ and exact fractions stay exact (<em>1/3 + 1/6</em> gives ½, with the decimal al
 </table>
 <h3>Tape</h3>
 <table class="help-keys">
-  <tr><td><kbd>↵</kbd></td><td>commit the expression to the tape</td></tr>
+  <tr><td><kbd>↵</kbd></td><td>commit the expression to the tape (graphs stay live)</td></tr>
   <tr><td><kbd>click</kbd></td><td>copy a result</td></tr>
   <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
 </table>`;
 
 const plugin = {
-  hints: [["↵", "add to tape"], ["ans", "last result"], ["click", "copy result"]],
+  hints: [["↵", "add to tape"], ["y=", "graph"], ["ans", "last result"], ["click", "copy"]],
   help: HELP,
   mount(root, hostApi) {
     api = hostApi;
     styleEl = document.createElement("style");
     styleEl.textContent = CSS;
     document.head.appendChild(styleEl);
-    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="tape"></div></div>`;
+    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden></div><div class="tape"></div></div>`;
     liveEl = root.querySelector(".live");
     tapeEl = root.querySelector(".tape");
+    graphEl = root.querySelector(".graph");
+    graphMode = false;
   },
   onInput(text) {
-    if (!text.trim()) { liveEl.innerHTML = PH; return; }
+    if (!text.trim()) { setGraphMode(false); liveEl.innerHTML = PH; return; }
     try {
-      const r = compute(text);
+      const r = analyze(text);
+      if (r.kind === "graph") {
+        graphEl.innerHTML = buildGraph(r.ast);
+        liveEl.innerHTML = `<span class="ex"><em>y</em> = ${rx(r.ast, 0)}</span><span class="dim">−10 ≤ <em>x</em> ≤ 10</span>`;
+        setGraphMode(true);
+        return;
+      }
+      setGraphMode(false);
       const f = fmtVal(r.val);
-      liveEl.innerHTML = `<span class="ex">${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span>`;
+      const lhs = r.kind === "assign" ? `<em>${r.name}</em> = ` : "";
+      liveEl.innerHTML = `<span class="ex">${lhs}${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span>`;
     } catch (e) {
+      // keep the current mode while mid-edit so the panel doesn't bounce
       liveEl.innerHTML = `<span class="err">${errMsg(e)}</span>`;
     }
   },
   onEnter(text) {
     let r;
-    try { r = compute(text); } catch { return; }
-    if (!r) return;
+    try { r = analyze(text); } catch { return; }
+    if (!r || r.kind === "graph") return;   // graphs are live-only
     const f = fmtVal(r.val);
     ansVal = r.val;
+    if (r.kind === "assign") VARS[r.name] = r.val;
+    const lhs = r.kind === "assign" ? `<em>${r.name}</em> = ` : "";
     const row = document.createElement("div");
     row.className = "row";
-    row.innerHTML = `<span class="ex">${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span>`;
+    row.innerHTML = `<span class="ex">${lhs}${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span>`;
     row.title = "Copy " + f.copy;
     row.onclick = () => {
       try { navigator.clipboard.writeText(f.copy); } catch {}
@@ -329,8 +434,10 @@ const plugin = {
   },
   unmount() {
     if (styleEl) styleEl.remove();
-    api = liveEl = tapeEl = null;
+    api = liveEl = tapeEl = graphEl = null;
+    graphMode = false;
     ansVal = { n: 0n, d: 1n };
+    VARS = {};
   },
 };
 export default plugin;

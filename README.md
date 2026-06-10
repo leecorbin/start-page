@@ -73,7 +73,10 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     fractions** (`1/3 + 1/6` → ½ = 0.5), pretty-rendered maths (stacked
     fractions, superscript exponents, radical signs), `%`/`of`, factorials,
     trig/log (radians), constants `π`/`e`, an `ans` variable, and a tape —
-    click any entry to copy its result.
+    click any entry to copy its result. Set **variables** (`x = 5`, `rate = 0.05`)
+    and use them in later expressions; type **`y = x^2 − 3`** (or any expression
+    with an unset `x`) and the panel grows into a **live graph** with axes,
+    asymptote-aware over −10 ≤ x ≤ 10.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

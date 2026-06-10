@@ -68,15 +68,18 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   returns to the normal omnibox. `⌘/` inside a plugin opens **its own help page**,
   and each plugin can be toggled on/off in Settings → Shortcuts. Plugins live in
   `plugins/*.js` and are only downloaded on first use, so the core page stays
-  instant.
+  instant. **Plugins load via dynamic `import()`, which browsers block from
+  `file://`** — so plugins only work when the page is *hosted* (the rest of the
+  page still works fine locally). When you deploy, ship the `plugins/` folder
+  alongside `index.html`.
   - 🧮 **Calculator** (`==`) — a safe, no-`eval` expression engine with **exact
     fractions** (`1/3 + 1/6` → ½ = 0.5), pretty-rendered maths (stacked
     fractions, superscript exponents, radical signs), `%`/`of`, factorials,
     trig/log (radians), constants `π`/`e`, an `ans` variable, and a tape —
     click any entry to copy its result. Set **variables** (`x = 5`, `rate = 0.05`)
     and use them in later expressions; type **`y = x^2 − 3`** (or any expression
-    with an unset `x`) and the panel grows into a **live graph** with axes,
-    asymptote-aware over −10 ≤ x ≤ 10.
+    with an unset `x`) and the panel grows into a **live graph** — gridlines and
+    axes, asymptote-aware, zoomable via the +/− buttons, scroll, or trackpad pinch.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
@@ -87,13 +90,14 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 
 It's a single static file, so you have two options:
 
-- **Host it (recommended).** Put `index.html` on any static host — your own
-  domain, GitHub Pages, Netlify, etc. — then set it as your browser's homepage and
+- **Host it (recommended).** Put `index.html` (and the `plugins/` folder) on any
+  static host — your own domain, GitHub Pages, Netlify, etc. — then set it as your browser's homepage and
   new-tab page. A real `https` origin gives you three things a local file can't:
   the search box can **auto-focus on new tabs/windows**, `localStorage` is
   rock-solid, and the address bar shows a clean URL.
 - **Open it locally.** Point your homepage at `file:///path/to/index.html` — zero
-  setup, but see the focus note below.
+  setup, but **plugins (e.g. the calculator) won't load from `file://`**, and see
+  the focus note below.
 
 In Safari: **Settings → General → Homepage**, then set **New windows** and
 **New tabs** to open with **Homepage**. Turn on **Focus box on load** in the

@@ -29,6 +29,7 @@ const CSS = `
 .calcp .gz:hover { background: rgba(255,255,255,0.14); color: #fff; }
 .calcp .tape[hidden], .calcp .graph[hidden] { display: none; }
 .calcp .gax { stroke: rgba(255,255,255,0.22); stroke-width: 1; }
+.calcp .ggrid { stroke: rgba(255,255,255,0.08); stroke-width: 1; }
 .calcp .gcurve { stroke: #8ab4ff; stroke-width: 2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .calcp .glabel { fill: rgba(244,246,251,0.45); font-size: 10px; font-family: ui-monospace, monospace; }
 `;
@@ -298,6 +299,7 @@ function analyze(text) {
 let xMin = -10, xMax = 10, lastAst = null;
 const GW = 560, GH = 250, GP = 10;
 const snum = (v) => String(Number(v.toPrecision(3)));
+const niceStep = (raw) => { const mag = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / mag; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag; };
 function buildGraph(ast) {
   const N = 240, pts = [];
   for (let i = 0; i <= N; i++) {
@@ -313,11 +315,7 @@ function buildGraph(ast) {
   // True range for smooth functions; percentile range only to tame asymptotes.
   if (!(hi > lo) || fullHi - fullLo <= 3 * (hi - lo)) { lo = fullLo; hi = fullHi; }
   if (!(hi > lo)) { lo -= 1; hi += 1; }
-  // Round the bounds outward to a "nice" step so the labels aren't arbitrary.
-  const niceStep = (raw) => { const mag = Math.pow(10, Math.floor(Math.log10(raw))); const n = raw / mag; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag; };
-  const step = niceStep((hi - lo) / 12);
-  lo = Math.floor(lo / step + 1e-9) * step;
-  hi = Math.ceil(hi / step - 1e-9) * step;
+  const pad = (hi - lo) * 0.06; lo -= pad; hi += pad;   // breathing room; bounds stay raw so zoom scales smoothly
   const px = (x) => GP + ((x - xMin) / (xMax - xMin)) * (GW - 2 * GP);
   const py = (y) => GH - GP - ((y - lo) / (hi - lo)) * (GH - 2 * GP);
   const span = hi - lo, limHi = hi + span, limLo = lo - span;
@@ -328,14 +326,22 @@ function buildGraph(ast) {
   }
   if (cur.length > 1) segs.push(cur);
   if (!segs.length) throw new Error("nothing to plot");
+  const grid = (min, max, toPix, horiz) => {
+    const st = niceStep((max - min) / 5); let out = "";
+    for (let k = Math.ceil(min / st); k <= Math.floor(max / st); k++) {
+      const v = k * st; if (Math.abs(v) < st * 1e-6) continue;   // 0 is the axis itself
+      const p = +toPix(v).toFixed(1);
+      out += horiz
+        ? `<line class="ggrid" x1="${GP}" y1="${p}" x2="${GW - GP}" y2="${p}"/><text class="glabel" x="${GP + 2}" y="${p - 3}">${snum(v)}</text>`
+        : `<line class="ggrid" x1="${p}" y1="${GP}" x2="${p}" y2="${GH - GP}"/><text class="glabel" x="${p}" y="${GH - GP - 3}" text-anchor="middle">${snum(v)}</text>`;
+    }
+    return out;
+  };
   let svg = `<svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg">`;
+  svg += grid(lo, hi, py, true) + grid(xMin, xMax, px, false);
   if (xMin <= 0 && 0 <= xMax) svg += `<line class="gax" x1="${px(0)}" y1="${GP}" x2="${px(0)}" y2="${GH - GP}"/>`;
   if (lo <= 0 && 0 <= hi) svg += `<line class="gax" x1="${GP}" y1="${py(0)}" x2="${GW - GP}" y2="${py(0)}"/>`;
   svg += segs.map((s) => `<polyline class="gcurve" points="${s.join(" ")}"/>`).join("");
-  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 4}">${snum(xMin)}</text>`;
-  svg += `<text class="glabel" x="${GW - GP - 2}" y="${GH - GP - 4}" text-anchor="end">${snum(xMax)}</text>`;
-  svg += `<text class="glabel" x="${GP + 2}" y="${GP + 10}">${snum(hi)}</text>`;
-  svg += `<text class="glabel" x="${GP + 2}" y="${GH - GP - 16}">${snum(lo)}</text>`;
   svg += `</svg>`;
   return svg;
 }
@@ -412,7 +418,7 @@ const plugin = {
     styleEl = document.createElement("style");
     styleEl.textContent = CSS;
     document.head.appendChild(styleEl);
-    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden><div class="gwrap"></div><div class="gzoom"><button class="gz" title="Zoom in">+</button><button class="gz" title="Zoom out">−</button><button class="gz" title="Reset zoom">⟲</button></div></div><div class="tape"></div></div>`;
+    root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden><div class="gwrap"></div><div class="gzoom"><button type="button" class="gz" title="Zoom in">+</button><button type="button" class="gz" title="Zoom out">−</button><button type="button" class="gz" title="Reset zoom">⟲</button></div></div><div class="tape"></div></div>`;
     liveEl = root.querySelector(".live");
     tapeEl = root.querySelector(".tape");
     graphEl = root.querySelector(".graph");

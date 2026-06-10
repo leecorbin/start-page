@@ -13,7 +13,7 @@ const CSS = `
 .calcp .row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; cursor: pointer; border-radius: 8px; padding: 0.28rem 0.45rem; }
 .calcp .row:hover { background: rgba(255,255,255,0.07); }
 .calcp .ex { opacity: 0.8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.calcp .res { color: var(--accent, #5b8def); font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.calcp .res { color: var(--accent, #5b9bff); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .calcp .dim { opacity: 0.55; }
 .calcp .copied { color: #7de0a0; font-size: 0.72rem; margin-left: 0.45rem; }
 .calcp .frac { display: inline-block; vertical-align: -0.65em; text-align: center; line-height: 1.15; margin: 0 0.14em; }
@@ -30,7 +30,7 @@ const CSS = `
 .calcp .tape[hidden], .calcp .graph[hidden] { display: none; }
 .calcp .gax { stroke: rgba(255,255,255,0.22); stroke-width: 1; }
 .calcp .ggrid { stroke: rgba(255,255,255,0.08); stroke-width: 1; }
-.calcp .gcurve { stroke: var(--accent, #5b8def); stroke-width: 2.2; fill: none; stroke-linejoin: round; stroke-linecap: round; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
+.calcp .gcurve { stroke: var(--accent, #5b9bff); stroke-width: 2.2; fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .calcp .glabel { fill: rgba(244,246,251,0.45); font-size: 10px; font-family: ui-monospace, monospace; }
 `;
 

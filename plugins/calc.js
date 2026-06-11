@@ -6,7 +6,12 @@
 
 const CSS = `
 .calcp { height: 100%; display: flex; flex-direction: column; font-size: 1.02rem; color: var(--fg, #f4f6fb); }
-.calcp .live { min-height: 3.2rem; flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; padding: 0.55rem 1rem 0.45rem; }
+.calcp .live { min-height: 3.2rem; flex: none; display: flex; flex-direction: column; justify-content: center; gap: 0.28rem; padding: 0.5rem 1rem 0.42rem; }
+.calcp .lhead { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.calcp .bases { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.calcp .b { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.74rem; color: rgba(244,246,251,0.6); cursor: pointer; border-radius: 5px; padding: 0.02rem 0.32rem; background: rgba(255,255,255,0.06); }
+.calcp .b:hover { background: rgba(255,255,255,0.14); color: var(--fg, #f4f6fb); }
+.calcp .b.cp { color: #7de0a0; }
 .calcp .ph { color: rgba(244,246,251,0.38); font-size: 0.83rem; }
 .calcp .err { color: rgba(244,246,251,0.45); font-size: 0.85rem; }
 .calcp .tape { flex: 1; overflow-y: auto; padding: 0.25rem 0.6rem 0.5rem; border-top: 1px solid rgba(255,255,255,0.09); display: flex; flex-direction: column; gap: 0.15rem; }
@@ -52,6 +57,12 @@ function tokenize(src) {
   while (i < s.length) {
     const c = s[i];
     if (c === " " || c === "\t") { i++; continue; }
+    if (c === "0" && "xbo".includes(s[i + 1])) {                    // hex / binary / octal literals
+      const k = s[i + 1], re = k === "x" ? /[0-9a-f]/ : k === "b" ? /[01]/ : /[0-7]/;
+      let j = i + 2; while (j < s.length && re.test(s[j])) j++;
+      if (j === i + 2) throw new Error("bad number");
+      toks.push({ k: "num", v: s.slice(i, j) }); i = j; continue;
+    }
     if (/[0-9.]/.test(c)) {
       let j = i; while (j < s.length && /[0-9.]/.test(s[j])) j++;
       const t = s.slice(i, j);
@@ -162,7 +173,7 @@ function rPow(x, y) {
 
 function eval_(node, env) {
   switch (node.t) {
-    case "num": return node.v.includes(".") ? fromDec(node.v) : rat(BigInt(node.v));
+    case "num": return /^0[xbo]/.test(node.v) ? rat(BigInt(node.v)) : node.v.includes(".") ? fromDec(node.v) : rat(BigInt(node.v));
     case "const": return node.name === "ans" ? env.ans : { f: CONSTS[node.name] };
     case "var": {
       const v = env.vars && env.vars[node.name];
@@ -223,6 +234,14 @@ function fmtVal(v) {
     html: `${sign}<span class="frac"><span class="fn">${nn}</span><span class="fd">${v.d}</span></span> <span class="dim">${isFiniteDec(v.d) ? "=" : "≈"} ${dec.html}</span>`,
     copy: dec.copy,
   };
+}
+
+// non-negative integer results (≤ 64-bit) also show hex / binary / octal, click to copy
+function basesHtml(v) {
+  if (!isRat(v) || v.d !== 1n || v.n < 0n || v.n > 0xffffffffffffffffn) return "";
+  const n = v.n;
+  const forms = ["0x" + n.toString(16).toUpperCase(), "0b" + n.toString(2).replace(/\B(?=(.{4})+$)/g, "_"), "0o" + n.toString(8)];
+  return `<div class="bases">${forms.map((s) => `<span class="b" data-copy="${s}">${s}</span>`).join("")}</div>`;
 }
 
 /* ============================ pretty-render ============================ */
@@ -349,7 +368,7 @@ function buildGraph(ast) {
 function showGraph(ast) {
   lastAst = ast;
   gwrapEl.innerHTML = buildGraph(ast);
-  liveEl.innerHTML = `<span class="ex"><em>y</em> = ${rx(ast, 0)}</span><span class="dim">${snum(xMin)} ≤ <em>x</em> ≤ ${snum(xMax)}</span>`;
+  liveEl.innerHTML = `<div class="lhead"><span class="ex"><em>y</em> = ${rx(ast, 0)}</span><span class="dim">${snum(xMin)} ≤ <em>x</em> ≤ ${snum(xMax)}</span></div>`;
 }
 function setXSpan(span) {
   span = Math.min(1e6, Math.max(1e-3, span));
@@ -388,6 +407,7 @@ and exact fractions stay exact (<em>1/3 + 1/6</em> gives ½, with the decimal al
   <tr><td><kbd>%</kbd></td><td>percent — 15% of 240</td></tr>
   <tr><td><kbd>!</kbd></td><td>factorial — 5!</td></tr>
   <tr><td><kbd>( )</kbd></td><td>grouping; implicit multiply works — 2π, 2(3+4)</td></tr>
+  <tr><td><kbd>0x 0b 0o</kbd></td><td>hex / binary / octal — <kbd>0xFF + 1</kbd>; whole-number results also show all bases (click to copy)</td></tr>
 </table>
 <h3>Variables &amp; graphs</h3>
 <table class="help-keys">
@@ -420,6 +440,11 @@ const plugin = {
     document.head.appendChild(styleEl);
     root.innerHTML = `<div class="calcp"><div class="live">${PH}</div><div class="graph" hidden><div class="gwrap"></div><div class="gzoom"><button type="button" class="gz" title="Zoom in">+</button><button type="button" class="gz" title="Zoom out">−</button><button type="button" class="gz" title="Reset zoom">⟲</button></div></div><div class="tape"></div></div>`;
     liveEl = root.querySelector(".live");
+    liveEl.addEventListener("click", (e) => {                      // click a base form to copy it
+      const b = e.target.closest(".b[data-copy]"); if (!b) return;
+      try { navigator.clipboard.writeText(b.dataset.copy); } catch {}
+      b.classList.add("cp"); setTimeout(() => b.classList.remove("cp"), 700);
+    });
     tapeEl = root.querySelector(".tape");
     graphEl = root.querySelector(".graph");
     gwrapEl = root.querySelector(".gwrap");
@@ -447,7 +472,7 @@ const plugin = {
       setGraphMode(false);
       const f = fmtVal(r.val);
       const lhs = r.kind === "assign" ? `<em>${r.name}</em> = ` : "";
-      liveEl.innerHTML = `<span class="ex">${lhs}${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span>`;
+      liveEl.innerHTML = `<div class="lhead"><span class="ex">${lhs}${rx(r.ast, 0)}</span><span class="res">= ${f.html}</span></div>${basesHtml(r.val)}`;
     } catch (e) {
       // keep the current mode while mid-edit so the panel doesn't bounce
       liveEl.innerHTML = `<span class="err">${errMsg(e)}</span>`;

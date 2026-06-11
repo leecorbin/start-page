@@ -112,6 +112,12 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     Title, Sentence, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE),
     a **slug**, reverse, trimmed, and **counts** (chars/words/lines/bytes) — each
     click-to-copy. The clear `×` resets it for the next snippet.
+  - 📖 **Dictionary** (`??`) — type a word for **definitions** + IPA + a **▶ play**
+    pronunciation, a **thesaurus** (synonyms / antonyms / related), and a
+    **Wikipedia** excerpt — all keyless (dictionaryapi.dev, Datamuse, Wikipedia
+    REST). **Click any word to look it up** and `←` to retrace, like the colour lab.
+    A ⚙ toggles **Urban Dictionary** slang (off by default). The one plugin that
+    uses the network — debounced and cached.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

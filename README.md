@@ -54,6 +54,17 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     a `backgrounds/manifest.json` listing the images — which also auto-fills the
     file list), so a typical hosted copy stays uncluttered.
   - **Solid colour**
+  - **Living wallpapers** — animated backgrounds that are themselves lazy-loaded
+    plugins (`plugins/wp-*.js`, registered in `WALLPAPERS`): each appears as a
+    background source and only downloads when picked. First up: **Lava lamp** —
+    slow, ambient colour blobs on a dark base (low-res canvas + CSS blur), with
+    five palettes plus a **Brand** palette pulled from your saved colours,
+    Ambient/Lively/Bold motion, and an Auto/Light/Dark text override. It pauses
+    on a hidden tab and honours `prefers-reduced-motion`. Tune it with the
+    **sliders button** over the wallpaper (which replaces the photo-only
+    download/star/customise controls). Wallpapers get a read-only window onto core
+    state (reduced-motion, the cached weather, and the on-screen UI rects), so a
+    future *weatherscape* can match the live forecast.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.

@@ -14,13 +14,14 @@ const CSS = `
 .col-hueh { position: absolute; top: 50%; width: 8px; height: 18px; border: 2px solid #fff; border-radius: 4px; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px rgba(0,0,0,0.45); pointer-events: none; }
 .col-ph { padding: 0.7rem 0.3rem; color: rgba(244,246,251,0.42); font-size: 0.85rem; line-height: 1.7; }
 .col-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
-.col-hero { border-radius: 12px; padding: 0.78rem 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-herorow { display: flex; gap: 0.5rem; align-items: stretch; }
+.col-hero { flex: 1; min-width: 0; border-radius: 12px; padding: 0.78rem 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
 .col-heroL { display: flex; flex-direction: column; gap: 0.08rem; min-width: 0; }
 .col-hex { font-size: 1.42rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .col-name { font-size: 0.78rem; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .col-heroBtns { display: flex; gap: 0.35rem; flex: none; }
-.col-picked { display: flex; flex-direction: column; gap: 3px; flex: none; }
-.col-pchip { width: 26px; height: 15px; padding: 0; border: none; border-radius: 4px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+.col-picked { display: flex; flex-direction: column; gap: 5px; flex: none; width: 38px; }
+.col-pchip { flex: 1; width: 100%; min-height: 16px; padding: 0; border: none; border-radius: 8px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
 .col-pchip.on { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 2px rgba(255,255,255,0.9); }
 .col-hbtn { font: inherit; font-size: 0.74rem; line-height: 1; padding: 0.36rem 0.62rem; border: none; border-radius: 8px; cursor: pointer; }
 .col-hbtn:disabled { opacity: 0.35; cursor: default; }
@@ -260,10 +261,10 @@ const copyLine = (k, v) => `<button type="button" class="col-copyline" data-copy
 const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-set="${hex}" title="${hex} — click to explore" style="background:${hex}"></button>`; };
 
 // after an eyedrop, offer both the shown (filtered) colour and the original photo pixel
-function pickedChips(hex) {
-  if (!picked || (hex !== picked.shown && hex !== picked.raw)) return "";
-  const chip = (col, lab, on) => `<button type="button" class="col-pchip${on ? " on" : ""}" data-set="${col}" title="${lab} — ${col}" style="background:${col}"></button>`;
-  return `<div class="col-picked">${chip(picked.shown, "Shown", hex === picked.shown)}${chip(picked.raw, "Original photo pixel", hex === picked.raw)}</div>`;
+function pickedCol(hex) {                                          // a little column beside the hero — only after an eyedrop
+  if (!picked) return "";
+  const chip = (col, lab, on) => `<button type="button" class="col-pchip${on ? " on" : ""}" data-set="${col}" title="${lab} — ${col} · click to use" style="background:${col}"></button>`;
+  return `<div class="col-picked">${chip(picked.shown, "Shown (adjusted)", hex === picked.shown)}${chip(picked.raw, "Original photo pixel", hex === picked.raw)}</div>`;
 }
 function buildInner(c, second) {
   const hex = toHex(c);
@@ -273,7 +274,7 @@ function buildInner(c, second) {
   const cw = contrast(c, { r: 255, g: 255, b: 255 }), ck = contrast(c, { r: 0, g: 0, b: 0 });
   const best = ck >= cw ? { t: "black", r: ck } : { t: "white", r: cw };
   let html = "";
-  html += `<div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div>${pickedChips(hex)}<div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>`;
+  html += `<div class="col-herorow"><div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div><div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>${pickedCol(hex)}</div>`;
   html += `<div class="col-formats">${fmtChip("RGB", rgbVals(c), fmtRgb(c))}${fmtChip("HSL", hslVals(c), fmtHsl(c))}${fmtChip("OKLCH", oklchVals(c), fmtOklch(c), "OKLCH — a modern, perceptually even colour space: lightness · chroma · hue (CSS Color 4). Click copies the CSS value.")}</div>`;
   html += `<div class="col-sec"><div class="col-h">Contrast</div><div class="col-contrast"><div class="col-ct" style="background:${hex};color:#fff"><b>Aa</b><span>${cw.toFixed(2)} · ${badge(cw)}</span></div><div class="col-ct" style="background:${hex};color:#000"><b>Aa</b><span>${ck.toFixed(2)} · ${badge(ck)}</span></div></div><div class="col-best">Best text: ${best.t} — ${best.r.toFixed(2)}:1 (${badge(best.r)})</div></div>`;
   html += `<div class="col-sec"><div class="col-h">Harmonies <span class="col-hint">· click to explore</span></div>` +

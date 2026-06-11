@@ -6,7 +6,7 @@
 
 const CSS = `
 .dxp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
-.dxp-inner { padding: 0.55rem 0.85rem 0.85rem; display: flex; flex-direction: column; gap: 0.7rem; }
+.dxp-inner { padding: 0.55rem 0.85rem 0.85rem; display: flex; flex-direction: column; }
 .dx-ph { padding: 0.7rem 0.3rem; color: rgba(244,246,251,0.45); font-size: 0.85rem; line-height: 1.7; }
 .dx-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
 .dx-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
@@ -16,7 +16,7 @@ const CSS = `
 .dx-ipa { font-size: 0.95rem; color: var(--muted, rgba(244,246,251,0.6)); font-family: ui-monospace, Menlo, monospace; }
 .dx-audio { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: none; background: var(--accent, #5b9bff); color: #fff; cursor: pointer; font-size: 0.7rem; }
 .dx-audio:hover { filter: brightness(1.1); }
-.dx-sec { display: flex; flex-direction: column; gap: 0.35rem; }
+.dx-sec { display: flex; flex-direction: column; gap: 0.35rem; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 0.75rem; padding-top: 0.75rem; }
 .dx-h { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
 .dx-hint { text-transform: none; letter-spacing: 0; opacity: 0.7; }
 .dx-loading { color: rgba(244,246,251,0.4); font-size: 0.85rem; padding: 0.1rem 0.2rem; }
@@ -32,7 +32,10 @@ const CSS = `
 .dx-chip { background: rgba(255,255,255,0.07); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 999px; color: var(--fg); font: inherit; font-size: 0.82rem; padding: 0.12rem 0.6rem; cursor: pointer; }
 .dx-chip:hover { background: var(--accent, #5b9bff); border-color: var(--accent, #5b9bff); color: #fff; }
 .dx-wiki { display: flex; gap: 0.7rem; align-items: flex-start; }
-.dx-thumb { flex: none; width: 72px; height: 72px; object-fit: cover; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+.dx-thumb { flex: none; width: 72px; height: 72px; object-fit: cover; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); cursor: zoom-in; }
+.dx-thumb:hover { outline: 2px solid rgba(255,255,255,0.5); outline-offset: -2px; }
+.dx-imgview { display: flex; justify-content: center; padding-top: 0.6rem; }
+.dx-imgview img { max-width: 100%; max-height: 52vh; border-radius: 10px; box-shadow: 0 6px 26px rgba(0,0,0,0.45); }
 .dx-wikitext { flex: 1; min-width: 0; }
 .dx-wikitext p { margin: 0 0 0.3rem; line-height: 1.45; font-size: 0.88rem; }
 .dx-wikilink { color: var(--accent, #5b9bff); text-decoration: none; font-size: 0.82rem; }
@@ -91,13 +94,14 @@ async function fetchUrban(w) {
 
 /* ---- state ---- */
 let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, settingsBtn = null;
-let term = "", history = [], gen = 0, cache = {}, debounceT = 0, toastT = 0, settingsOpen = false;
+let term = "", history = [], gen = 0, cache = {}, debounceT = 0, toastT = 0, settingsOpen = false, imageView = null;
 const MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));
 function fit() { if (innerEl) api.setHeight(Math.min(innerEl.offsetHeight, MAXH())); }
 function toast(msg) { if (!toastEl) return; toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 1100); }
 
 function lookup(word, push) {
   word = (word || "").trim();
+  imageView = null;
   if (!word) { term = ""; gen++; render(true); return; }
   if (push && term && term.toLowerCase() !== word.toLowerCase()) history.push(term);
   term = word;
@@ -154,36 +158,47 @@ function buildView(word, d) {
   else if (wiki && wiki.extract) {
     const link = wiki.content_urls && wiki.content_urls.desktop && wiki.content_urls.desktop.page;
     const thumb = wiki.thumbnail && wiki.thumbnail.source;
-    html += `<div class="dx-sec"><div class="dx-h">Wikipedia</div><div class="dx-wiki">${thumb ? `<img class="dx-thumb" src="${esc(thumb)}" alt="" loading="lazy" />` : ""}<div class="dx-wikitext"><p>${esc(wiki.extract)}</p>${link ? `<a class="dx-wikilink" href="${esc(link)}" target="_blank" rel="noopener">Read on Wikipedia →</a>` : ""}</div></div></div>`;
+    const big = (wiki.originalimage && wiki.originalimage.source) || thumb;
+    html += `<div class="dx-sec"><div class="dx-h">Wikipedia</div><div class="dx-wiki">${thumb ? `<img class="dx-thumb" src="${esc(thumb)}" data-img="${esc(big)}" alt="" loading="lazy" title="Click to enlarge" />` : ""}<div class="dx-wikitext"><p>${esc(wiki.extract)}</p>${link ? `<a class="dx-wikilink" href="${esc(link)}" target="_blank" rel="noopener">Read on Wikipedia →</a>` : ""}</div></div></div>`;
   }
 
   if (SET.urban) {
     const urban = d.urban;
     html += `<div class="dx-sec"><div class="dx-h">Urban Dictionary <span class="dx-hint">· slang</span></div>`;
     if (urban === undefined) html += loading();
-    else if (urban && urban.length) html += urban.map((u) => `<div class="dx-urban">${esc(stripBrackets(u.definition)).slice(0, 500)}</div>`).join("");
-    else html += `<div class="dx-none">No slang entry.</div>`;
+    else if (urban && urban.length) {
+      html += urban.map((u) => `<div class="dx-urban">${esc(stripBrackets(u.definition)).slice(0, 500)}</div>`).join("");
+      html += `<a class="dx-wikilink" href="${esc(urban[0].permalink || ("https://www.urbandictionary.com/define.php?term=" + encodeURIComponent(word)))}" target="_blank" rel="noopener">Read on Urban Dictionary →</a>`;
+    } else html += `<div class="dx-none">No slang entry.</div>`;
     html += `</div>`;
   }
   return html;
 }
 function settingsView() {
-  return `<div class="dx-sec"><div class="dx-h">Sources</div>
+  return `<div class="dx-head"><button type="button" class="dx-back" data-act="settings-close" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">Sources &amp; options</span></div>
+    <div class="dx-sec"><div class="dx-h">Slang</div>
     <button type="button" class="dx-switch${SET.urban ? " on" : ""}" data-act="toggle-urban"><span class="dx-knob"></span><span class="dx-swlabel">Urban Dictionary <em>— slang, user-submitted &amp; can be explicit</em></span></button>
-    <div class="dx-note">Dictionary, thesaurus and Wikipedia are always on. Toggle applies on your next lookup.</div></div>`;
+    <div class="dx-note">Dictionary, thesaurus and Wikipedia are always on. The toggle applies on your next lookup.</div></div>`;
+}
+function imageView_() {
+  return `<div class="dx-head"><button type="button" class="dx-back" data-act="img-back" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">${esc(term)}</span></div><div class="dx-imgview"><img src="${esc(imageView)}" alt="" /></div>`;
 }
 function render(resetScroll) {
   if (!innerEl) return;
   const sv = scrollEl ? scrollEl.scrollTop : 0;
-  innerEl.innerHTML = settingsOpen ? settingsView() : (term ? buildView(term, cache[term] || {}) : PH_HTML);
+  innerEl.innerHTML = imageView ? imageView_() : settingsOpen ? settingsView() : (term ? buildView(term, cache[term] || {}) : PH_HTML);
   if (scrollEl) scrollEl.scrollTop = resetScroll ? 0 : sv;
   fit();
 }
 
 function onClick(e) {
+  const img = e.target.closest("[data-img]");
+  if (img) { imageView = img.getAttribute("data-img"); render(true); return; }   // enlarge the wiki image in the box
+  if (e.target.closest('[data-act="img-back"]')) { imageView = null; render(false); return; }
+  if (e.target.closest('[data-act="settings-close"]')) { toggleSettings(); return; }
   const w = e.target.closest("[data-word]");
-  if (w) { const word = w.getAttribute("data-word"); if (api) api.setInput(word); lookup(word, true); return; }
-  if (e.target.closest('[data-act="back"]')) { if (history.length) { const p = history.pop(); if (api) api.setInput(p); lookup(p, false); } return; }
+  if (w) { imageView = null; const word = w.getAttribute("data-word"); if (api) api.setInput(word); lookup(word, true); return; }
+  if (e.target.closest('[data-act="back"]')) { if (history.length) { imageView = null; const p = history.pop(); if (api) api.setInput(p); lookup(p, false); } return; }
   const au = e.target.closest("[data-audio]");
   if (au) { try { new Audio(au.getAttribute("data-audio")).play(); } catch {} return; }
   if (e.target.closest('[data-act="toggle-urban"]')) { SET.urban = !SET.urban; persistSettings(); cache = {}; render(false); return; }
@@ -237,7 +252,7 @@ const plugin = {
     if (styleEl) styleEl.remove();
     clearTimeout(debounceT); clearTimeout(toastT);
     api = scrollEl = innerEl = toastEl = styleEl = settingsBtn = null;
-    term = ""; history = []; cache = {}; settingsOpen = false;
+    term = ""; history = []; cache = {}; settingsOpen = false; imageView = null;
   },
 };
 export default plugin;

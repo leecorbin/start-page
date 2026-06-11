@@ -28,7 +28,7 @@ const CSS = `
 .col-sec { display: flex; flex-direction: column; gap: 0.32rem; }
 .col-h { font-size: 0.62rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
 .col-row { display: flex; align-items: center; gap: 0.5rem; }
-.col-row .lab { font-size: 0.72rem; color: var(--muted, rgba(244,246,251,0.6)); width: 4.9rem; flex: none; }
+.col-row .lab { font-size: 0.72rem; color: var(--muted, rgba(244,246,251,0.6)); width: 5.7rem; flex: none; white-space: nowrap; padding-right: 0.3rem; box-sizing: border-box; }
 .col-sws { display: flex; gap: 0.3rem; flex: 1; }
 .sw { flex: 1; height: 30px; border-radius: 7px; border: none; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); padding: 0; transition: outline-color 0.12s; outline: 2px solid transparent; outline-offset: -2px; }
 .sw:hover { outline-color: rgba(255,255,255,0.65); }
@@ -234,7 +234,6 @@ const badge = (r) => (r >= 7 ? "AAA" : r >= 4.5 ? "AA" : r >= 3 ? "AA large" : "
 const fmtChip = (k, disp, copy, title) => `<button type="button" data-copy="${copy}" title="${title || ("Copy " + copy)}"><span class="k">${k}</span><span class="v">${disp}</span></button>`;
 const copyLine = (k, v) => `<button type="button" class="col-copyline" data-copy="${v}" title="Copy ${v}"><span class="k">${k}</span><span class="v">${v}</span></button>`;
 const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-set="${hex}" title="${hex} — click to explore" style="background:${hex}"></button>`; };
-const swatchStatic = (rgb) => { const hex = toHex(rgb); return `<div class="sw" title="${hex}" style="background:${hex}"></div>`; };
 
 function buildInner(c, second) {
   const hex = toHex(c);
@@ -255,7 +254,7 @@ function buildInner(c, second) {
     html += `<div class="col-sec"><div class="col-h">Gradient</div><div class="col-gbar" style="background:${g}"></div>${copyLine("CSS", g)}</div>`;
   }
   html += `<div class="col-sec"><div class="col-h">Colour vision</div><div class="col-cvd">` +
-    Object.entries(CVD).map(([k, m]) => `<div>${swatchStatic(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
+    Object.entries(CVD).map(([k, m]) => `<div>${swatch(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
   return html;
 }
 

@@ -70,6 +70,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - ⭐ **Frequent sites** — an optional second row that auto-surfaces the sites you
   visit most (above a min-visits threshold, excluding ones you've already pinned),
   with the same brand icons; hover an icon and tap × to forget it.
+- 🧩 **Plugins row** — an optional row of one-click launchers for your installed
+  plugins (calculator, colour…); toggle it in Settings.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always

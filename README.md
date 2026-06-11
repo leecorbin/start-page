@@ -88,6 +88,12 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     and use them in later expressions; type **`y = x^2 − 3`** (or any expression
     with an unset `x`) and the panel grows into a **live graph** — gridlines and
     axes, asymptote-aware, zoomable via the +/− buttons, scroll, or trackpad pinch.
+  - 🎨 **Colour** (`#`) — a keyless colour studio. Type a hex, `rgb()`, `hsl()`,
+    `oklch()` or a CSS name and get every format (click to copy), the nearest named
+    colour, **WCAG contrast** on white &amp; black with AA/AAA and the best text
+    colour, **harmonies** (complementary / analogous / triadic / tetradic),
+    a tint-and-shade ramp, and a **colour-blindness** preview. Type two colours
+    (`#5b9bff #ff5b9b`) for a **gradient** with copyable CSS. All offline maths.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

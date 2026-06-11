@@ -830,6 +830,7 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
    onEnter(text), unmount() } — api: { setInput, getInput, setHeight, close }. */
 const PLUGINS = [
   { id: "calc", trigger: "==", title: "Calculator", icon: "=", height: 210, src: "./plugins/calc.js" },
+  { id: "color", trigger: "#", title: "Colour", icon: "#", height: 96, src: "./plugins/color.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");

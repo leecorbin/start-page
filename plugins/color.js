@@ -1,0 +1,321 @@
+/* start-page plugin: Colour (trigger "#")
+   A keyless colour studio — formats (HEX/RGB/HSL/OKLCH), WCAG contrast,
+   harmonies, tints/shades, gradients and colour-blindness simulation.
+   Pure client-side colour maths, no network. Part of start-page (MIT). */
+
+const CSS = `
+.colp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
+.colp-inner { padding: 0.55rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.col-ph { padding: 0.7rem 0.3rem; color: rgba(244,246,251,0.42); font-size: 0.85rem; line-height: 1.7; }
+.col-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
+.col-hero { border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.12rem; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-hex { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.col-name { font-size: 0.79rem; opacity: 0.82; }
+.col-formats { display: flex; flex-direction: column; gap: 0.28rem; }
+.col-formats button { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.32rem 0.6rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+.col-formats button:hover { background: rgba(255,255,255,0.12); }
+.col-formats .k { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); flex: none; }
+.col-formats .v { font-variant-numeric: tabular-nums; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-sec { display: flex; flex-direction: column; gap: 0.32rem; }
+.col-h { font-size: 0.62rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
+.col-row { display: flex; align-items: center; gap: 0.5rem; }
+.col-row .lab { font-size: 0.72rem; color: var(--muted, rgba(244,246,251,0.6)); width: 4.9rem; flex: none; }
+.col-sws { display: flex; gap: 0.3rem; flex: 1; }
+.sw { flex: 1; height: 30px; border-radius: 7px; border: none; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); padding: 0; transition: outline-color 0.12s; outline: 2px solid transparent; outline-offset: -2px; }
+.sw:hover { outline-color: rgba(255,255,255,0.65); }
+.col-ramp { display: flex; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-ramp .sw { border-radius: 0; box-shadow: none; height: 34px; }
+.col-contrast { display: flex; gap: 0.4rem; }
+.col-ct { flex: 1; border-radius: 9px; padding: 0.45rem 0.6rem; display: flex; align-items: center; justify-content: space-between; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-ct b { font-size: 1.02rem; font-weight: 600; }
+.col-ct span { font-size: 0.68rem; font-variant-numeric: tabular-nums; }
+.col-best { font-size: 0.74rem; color: var(--muted, rgba(244,246,251,0.6)); }
+.col-gbar { height: 38px; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-cvd { display: flex; gap: 0.4rem; }
+.col-cvd > div { flex: 1; display: flex; flex-direction: column; gap: 0.22rem; align-items: stretch; text-align: center; }
+.col-cvd .sw { flex: none; width: 100%; height: 32px; }
+.col-cvd .lab { font-size: 0.62rem; color: var(--muted, rgba(244,246,251,0.6)); }
+.col-toast { position: absolute; left: 50%; bottom: 11px; transform: translateX(-50%) translateY(8px); background: rgba(12,16,24,0.94); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); color: var(--fg, #f4f6fb); font-size: 0.77rem; padding: 0.3rem 0.75rem; border-radius: 999px; opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none; white-space: nowrap; }
+.col-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+`;
+
+const PH_HTML = `<div class="col-ph">Type a colour — <code>#5b9bff</code>, <code>rgb(91 155 255)</code>, <code>cornflowerblue</code>, <code>oklch(.68 .16 256)</code>. The <code>#</code> is optional.<br>Two colours — <code>#5b9bff #ff5b9b</code> — draw a gradient.</div>`;
+
+/* ============================ named colours (CSS) ============================ */
+const NAMES = {
+  aliceblue:"f0f8ff", antiquewhite:"faebd7", aqua:"00ffff", aquamarine:"7fffd4", azure:"f0ffff",
+  beige:"f5f5dc", bisque:"ffe4c4", black:"000000", blanchedalmond:"ffebcd", blue:"0000ff",
+  blueviolet:"8a2be2", brown:"a52a2a", burlywood:"deb887", cadetblue:"5f9ea0", chartreuse:"7fff00",
+  chocolate:"d2691e", coral:"ff7f50", cornflowerblue:"6495ed", cornsilk:"fff8dc", crimson:"dc143c",
+  cyan:"00ffff", darkblue:"00008b", darkcyan:"008b8b", darkgoldenrod:"b8860b", darkgray:"a9a9a9",
+  darkgreen:"006400", darkkhaki:"bdb76b", darkmagenta:"8b008b", darkolivegreen:"556b2f", darkorange:"ff8c00",
+  darkorchid:"9932cc", darkred:"8b0000", darksalmon:"e9967a", darkseagreen:"8fbc8f", darkslateblue:"483d8b",
+  darkslategray:"2f4f4f", darkturquoise:"00ced1", darkviolet:"9400d3", deeppink:"ff1493", deepskyblue:"00bfff",
+  dimgray:"696969", dodgerblue:"1e90ff", firebrick:"b22222", floralwhite:"fffaf0", forestgreen:"228b22",
+  fuchsia:"ff00ff", gainsboro:"dcdcdc", ghostwhite:"f8f8ff", gold:"ffd700", goldenrod:"daa520",
+  gray:"808080", green:"008000", greenyellow:"adff2f", grey:"808080", honeydew:"f0fff0",
+  hotpink:"ff69b4", indianred:"cd5c5c", indigo:"4b0082", ivory:"fffff0", khaki:"f0e68c",
+  lavender:"e6e6fa", lavenderblush:"fff0f5", lawngreen:"7cfc00", lemonchiffon:"fffacd", lightblue:"add8e6",
+  lightcoral:"f08080", lightcyan:"e0ffff", lightgoldenrodyellow:"fafad2", lightgray:"d3d3d3", lightgreen:"90ee90",
+  lightpink:"ffb6c1", lightsalmon:"ffa07a", lightseagreen:"20b2aa", lightskyblue:"87cefa", lightslategray:"778899",
+  lightsteelblue:"b0c4de", lightyellow:"ffffe0", lime:"00ff00", limegreen:"32cd32", linen:"faf0e6",
+  magenta:"ff00ff", maroon:"800000", mediumaquamarine:"66cdaa", mediumblue:"0000cd", mediumorchid:"ba55d3",
+  mediumpurple:"9370db", mediumseagreen:"3cb371", mediumslateblue:"7b68ee", mediumspringgreen:"00fa9a", mediumturquoise:"48d1cc",
+  mediumvioletred:"c71585", midnightblue:"191970", mintcream:"f5fffa", mistyrose:"ffe4e1", moccasin:"ffe4b5",
+  navajowhite:"ffdead", navy:"000080", oldlace:"fdf5e6", olive:"808000", olivedrab:"6b8e23",
+  orange:"ffa500", orangered:"ff4500", orchid:"da70d6", palegoldenrod:"eee8aa", palegreen:"98fb98",
+  paleturquoise:"afeeee", palevioletred:"db7093", papayawhip:"ffefd5", peachpuff:"ffdab9", peru:"cd853f",
+  pink:"ffc0cb", plum:"dda0dd", powderblue:"b0e0e6", purple:"800080", rebeccapurple:"663399",
+  red:"ff0000", rosybrown:"bc8f8f", royalblue:"4169e1", saddlebrown:"8b4513", salmon:"fa8072",
+  sandybrown:"f4a460", seagreen:"2e8b57", seashell:"fff5ee", sienna:"a0522d", silver:"c0c0c0",
+  skyblue:"87ceeb", slateblue:"6a5acd", slategray:"708090", snow:"fffafa", springgreen:"00ff7f",
+  steelblue:"4682b4", tan:"d2b48c", teal:"008080", thistle:"d8bfd8", tomato:"ff6347",
+  turquoise:"40e0d0", violet:"ee82ee", wheat:"f5deb3", white:"ffffff", whitesmoke:"f5f5f5",
+  yellow:"ffff00", yellowgreen:"9acd32",
+};
+
+/* ============================ conversions ============================ */
+const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const clampByte = (x) => Math.max(0, Math.min(255, Math.round(x)));
+const hx = (n) => clampByte(n).toString(16).padStart(2, "0");
+const toHex = ({ r, g, b }) => "#" + hx(r) + hx(g) + hx(b);
+function hexToRgb(h) { h = h.replace(/^#/, ""); return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) }; }
+
+function rgbToHsl({ r, g, b }) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0, s = 0; const l = (mx + mn) / 2;
+  if (d) {
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    h *= 60;
+  }
+  return { h, s, l };
+}
+function hslToRgb(h, s, l) {
+  h = (((h % 360) + 360) % 360) / 360;
+  if (s === 0) { const v = Math.round(l * 255); return { r: v, g: v, b: v }; }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const hue = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return { r: Math.round(hue(h + 1 / 3) * 255), g: Math.round(hue(h) * 255), b: Math.round(hue(h - 1 / 3) * 255) };
+}
+
+const srgbToLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+const linToByte = (c) => clampByte((c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055) * 255);
+function rgbToOklab({ r, g, b }) {
+  const lr = srgbToLin(r), lg = srgbToLin(g), lb = srgbToLin(b);
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return {
+    L: 0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+    a: 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    b: 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+  };
+}
+function oklabToRgb(L, a, b) {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.2914855480 * b) ** 3;
+  return {
+    r: linToByte(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    g: linToByte(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    b: linToByte(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s),
+  };
+}
+function rgbToOklch(rgb) {
+  const { L, a, b } = rgbToOklab(rgb);
+  let h = Math.atan2(b, a) * 180 / Math.PI; if (h < 0) h += 360;
+  return { L, C: Math.sqrt(a * a + b * b), h };
+}
+const oklchToRgb = (L, C, h) => oklabToRgb(L, C * Math.cos(h * Math.PI / 180), C * Math.sin(h * Math.PI / 180));
+
+function relLum({ r, g, b }) { return 0.2126 * srgbToLin(r) + 0.7152 * srgbToLin(g) + 0.0722 * srgbToLin(b); }
+function contrast(a, b) { const la = relLum(a), lb = relLum(b); return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); }
+
+// sRGB colour-blindness simulation matrices (severity ~1.0)
+const CVD = {
+  Protanopia: [0.567, 0.433, 0, 0.558, 0.442, 0, 0, 0.242, 0.758],
+  Deuteranopia: [0.625, 0.375, 0, 0.70, 0.30, 0, 0, 0.30, 0.70],
+  Tritanopia: [0.95, 0.05, 0, 0, 0.433, 0.567, 0, 0.475, 0.525],
+};
+const simCvd = ({ r, g, b }, m) => ({ r: clampByte(m[0] * r + m[1] * g + m[2] * b), g: clampByte(m[3] * r + m[4] * g + m[5] * b), b: clampByte(m[6] * r + m[7] * g + m[8] * b) });
+
+/* ============================ parsing ============================ */
+function parsePartsRgb(s) {
+  const p = s.replace(/^rgba?\(|\)$/g, "").split(/[\s,/]+/).filter(Boolean);
+  if (p.length < 3) return null;
+  const v = p.slice(0, 3).map((x) => (x.endsWith("%") ? parseFloat(x) * 2.55 : parseFloat(x)));
+  if (v.some(isNaN)) return null;
+  return { r: clampByte(v[0]), g: clampByte(v[1]), b: clampByte(v[2]) };
+}
+function parsePartsHsl(s) {
+  const p = s.replace(/^hsla?\(|\)$/g, "").split(/[\s,/]+/).filter(Boolean);
+  if (p.length < 3) return null;
+  const h = parseFloat(p[0]), sa = parseFloat(p[1]) / 100, l = parseFloat(p[2]) / 100;
+  if ([h, sa, l].some(isNaN)) return null;
+  return hslToRgb(h, clamp01(sa), clamp01(l));
+}
+function parsePartsOklch(s) {
+  const p = s.replace(/^oklch\(|\)$/g, "").split(/[\s,/]+/).filter(Boolean);
+  if (p.length < 3) return null;
+  const L = p[0].endsWith("%") ? parseFloat(p[0]) / 100 : parseFloat(p[0]);
+  const C = parseFloat(p[1]), h = parseFloat(p[2]);
+  if ([L, C, h].some(isNaN)) return null;
+  return oklchToRgb(L, C, h);
+}
+function parseColor(str) {
+  const s = str.trim().toLowerCase();
+  if (!s) return null;
+  if (NAMES[s]) return hexToRgb(NAMES[s]);
+  if (/^rgba?\(/.test(s)) return parsePartsRgb(s);
+  if (/^hsla?\(/.test(s)) return parsePartsHsl(s);
+  if (/^oklch\(/.test(s)) return parsePartsOklch(s);
+  const h = s.replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/.test(h)) return { r: parseInt(h[0] + h[0], 16), g: parseInt(h[1] + h[1], 16), b: parseInt(h[2] + h[2], 16) };
+  if (/^[0-9a-f]{4}$/.test(h)) return { r: parseInt(h[0] + h[0], 16), g: parseInt(h[1] + h[1], 16), b: parseInt(h[2] + h[2], 16) };
+  if (/^[0-9a-f]{6}$/.test(h)) return hexToRgb(h);
+  if (/^[0-9a-f]{8}$/.test(h)) return hexToRgb(h);
+  if (/^\d+%?(?:[\s,]+\d+%?){2}$/.test(s)) return parsePartsRgb(s);
+  return null;
+}
+const SCAN = /rgba?\([^)]*\)|hsla?\([^)]*\)|oklch\([^)]*\)|#?[0-9a-f]{8}\b|#?[0-9a-f]{6}\b|#?[0-9a-f]{4}\b|#?[0-9a-f]{3}\b|[a-z]{3,}/gi;
+function findColors(text) {
+  const out = [], m = text.match(SCAN);
+  if (m) for (const tok of m) { const c = parseColor(tok); if (c) { out.push(c); if (out.length >= 2) break; } }
+  return out;
+}
+
+/* ============================ derived sets ============================ */
+let NAMED_LAB = null;
+function nearestName(rgb) {
+  if (!NAMED_LAB) NAMED_LAB = Object.keys(NAMES).map((n) => ({ n, lab: rgbToOklab(hexToRgb(NAMES[n])) }));
+  const t = rgbToOklab(rgb);
+  let best = "", bd = Infinity;
+  for (const e of NAMED_LAB) { const d = (e.lab.L - t.L) ** 2 + (e.lab.a - t.a) ** 2 + (e.lab.b - t.b) ** 2; if (d < bd) { bd = d; best = e.n; } }
+  return { name: best, exact: bd < 1e-6 };
+}
+const rotate = (rgb, deg) => { const { h, s, l } = rgbToHsl(rgb); return hslToRgb(h + deg, s, l); };
+function harmonies(rgb) {
+  return {
+    Complementary: [rgb, rotate(rgb, 180)],
+    Analogous: [rotate(rgb, -30), rgb, rotate(rgb, 30)],
+    Triadic: [rgb, rotate(rgb, 120), rotate(rgb, 240)],
+    Tetradic: [rgb, rotate(rgb, 90), rotate(rgb, 180), rotate(rgb, 270)],
+  };
+}
+const mix = (a, b, t) => ({ r: a.r + (b.r - a.r) * t, g: a.g + (b.g - a.g) * t, b: a.b + (b.b - a.b) * t });
+function ramp(rgb) {
+  const W = { r: 255, g: 255, b: 255 }, K = { r: 0, g: 0, b: 0 }, out = [];
+  for (const t of [0.8, 0.6, 0.4, 0.2]) out.push(mix(rgb, W, t));
+  out.push(rgb);
+  for (const t of [0.2, 0.4, 0.6, 0.8]) out.push(mix(rgb, K, t));
+  return out;
+}
+
+/* ============================ formats / render ============================ */
+const fmtRgb = (c) => `rgb(${c.r}, ${c.g}, ${c.b})`;
+function fmtHsl(c) { const { h, s, l } = rgbToHsl(c); return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`; }
+function fmtOklch(c) { const { L, C, h } = rgbToOklch(c); return `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${h.toFixed(1)})`; }
+const badge = (r) => (r >= 7 ? "AAA" : r >= 4.5 ? "AA" : r >= 3 ? "AA large" : "fail");
+const fmtBtn = (k, v) => `<button type="button" data-copy="${v}" title="Copy ${v}"><span class="k">${k}</span><span class="v">${v}</span></button>`;
+const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-copy="${hex}" title="${hex}" style="background:${hex}"></button>`; };
+
+function buildInner(colors) {
+  const c = colors[0], hex = toHex(c);
+  const textC = contrast(c, { r: 0, g: 0, b: 0 }) >= contrast(c, { r: 255, g: 255, b: 255 }) ? "#000" : "#fff";
+  const nm = nearestName(c), nameLabel = nm.exact ? nm.name : "≈ " + nm.name;
+  const cw = contrast(c, { r: 255, g: 255, b: 255 }), ck = contrast(c, { r: 0, g: 0, b: 0 });
+  const best = ck >= cw ? { t: "black", r: ck } : { t: "white", r: cw };
+  let html = "";
+  html += `<div class="col-hero" data-copy="${hex}" style="background:${hex};color:${textC}"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel} · click to copy</div></div>`;
+  html += `<div class="col-formats">${fmtBtn("RGB", fmtRgb(c))}${fmtBtn("HSL", fmtHsl(c))}${fmtBtn("OKLCH", fmtOklch(c))}</div>`;
+  html += `<div class="col-sec"><div class="col-h">Contrast</div><div class="col-contrast"><div class="col-ct" style="background:${hex};color:#fff"><b>Aa</b><span>${cw.toFixed(2)} · ${badge(cw)}</span></div><div class="col-ct" style="background:${hex};color:#000"><b>Aa</b><span>${ck.toFixed(2)} · ${badge(ck)}</span></div></div><div class="col-best">Best text: ${best.t} — ${best.r.toFixed(2)}:1 (${badge(best.r)})</div></div>`;
+  html += `<div class="col-sec"><div class="col-h">Harmonies</div>` +
+    Object.entries(harmonies(c)).map(([k, arr]) => `<div class="col-row"><span class="lab">${k}</span><span class="col-sws">${arr.map(swatch).join("")}</span></div>`).join("") + `</div>`;
+  html += `<div class="col-sec"><div class="col-h">Tints &amp; shades</div><div class="col-ramp">${ramp(c).map(swatch).join("")}</div></div>`;
+  if (colors.length >= 2) {
+    const g = `linear-gradient(90deg, ${hex}, ${toHex(colors[1])})`;
+    html += `<div class="col-sec"><div class="col-h">Gradient</div><div class="col-gbar" style="background:${g}"></div><div class="col-formats">${fmtBtn("CSS", g)}</div></div>`;
+  }
+  html += `<div class="col-sec"><div class="col-h">Colour vision</div><div class="col-cvd">` +
+    Object.entries(CVD).map(([k, m]) => `<div>${swatch(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
+  return html;
+}
+
+/* ============================ plugin ============================ */
+const HELP = `
+<p>Type any colour into the box — <em>#5b9bff</em>, <em>rgb(91 155 255)</em>, <em>hsl(217 100% 68%)</em>,
+<em>oklch(.68 .16 256)</em>, or a CSS name like <em>cornflowerblue</em>. The <kbd>#</kbd> is optional.</p>
+<h3>What you get</h3>
+<table class="help-keys">
+  <tr><td><kbd>formats</kbd></td><td>HEX · RGB · HSL · OKLCH — click any to copy</td></tr>
+  <tr><td><kbd>contrast</kbd></td><td>WCAG ratios on white &amp; black, with AA/AAA and the best text colour</td></tr>
+  <tr><td><kbd>harmonies</kbd></td><td>complementary, analogous, triadic, tetradic</td></tr>
+  <tr><td><kbd>tints</kbd></td><td>a light-to-dark ramp</td></tr>
+  <tr><td><kbd>gradient</kbd></td><td>type two colours — <em>#5b9bff #ff5b9b</em></td></tr>
+  <tr><td><kbd>vision</kbd></td><td>how it reads under colour-blindness (prot/deuter/trit)</td></tr>
+</table>
+<h3>Keys</h3>
+<table class="help-keys">
+  <tr><td><kbd>↵</kbd></td><td>copy the hex</td></tr>
+  <tr><td><kbd>click</kbd></td><td>copy any swatch or value</td></tr>
+  <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
+</table>`;
+
+let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0, lastColors = null;
+
+const MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));
+function fit() { if (innerEl) api.setHeight(Math.min(innerEl.offsetHeight, MAXH())); }
+function toast(msg) {
+  if (!toastEl) return;
+  toastEl.textContent = msg; toastEl.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 1100);
+}
+function onClick(e) {
+  const el = e.target.closest("[data-copy]"); if (!el) return;
+  const v = el.getAttribute("data-copy");
+  try { navigator.clipboard.writeText(v); } catch {}
+  toast("Copied " + v);
+}
+
+const plugin = {
+  hints: [["↵", "copy hex"], ["click", "copy"], ["#a #b", "gradient"]],
+  help: HELP,
+  mount(root, hostApi) {
+    api = hostApi;
+    styleEl = document.createElement("style"); styleEl.textContent = CSS; document.head.appendChild(styleEl);
+    root.innerHTML = `<div class="colp"><div class="colp-inner"></div></div><div class="col-toast"></div>`;
+    scrollEl = root.querySelector(".colp");
+    innerEl = root.querySelector(".colp-inner");
+    toastEl = root.querySelector(".col-toast");
+    innerEl.innerHTML = PH_HTML;
+    lastColors = null;
+    root.addEventListener("click", onClick);
+    fit();
+  },
+  onInput(text) {
+    const t = (text || "").trim();
+    if (!t) { innerEl.innerHTML = PH_HTML; lastColors = null; fit(); return; }
+    const colors = findColors(t);
+    if (!colors.length) { if (!lastColors) { innerEl.innerHTML = PH_HTML; fit(); } return; }  // keep last good while mid-type
+    lastColors = colors;
+    innerEl.innerHTML = buildInner(colors);
+    if (scrollEl) scrollEl.scrollTop = 0;
+    fit();
+  },
+  onEnter(text) {
+    const colors = findColors((text || "").trim());
+    if (!colors.length) return;
+    const hex = toHex(colors[0]);
+    try { navigator.clipboard.writeText(hex); } catch {}
+    toast("Copied " + hex);
+  },
+  unmount() {
+    if (styleEl) styleEl.remove();
+    clearTimeout(toastT);
+    api = scrollEl = innerEl = toastEl = styleEl = null;
+    lastColors = null;
+  },
+};
+export default plugin;

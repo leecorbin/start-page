@@ -158,6 +158,7 @@
   .ctl:hover { opacity: 1; background: rgba(0,0,0,0.32); }
   .ctl svg { width: 20px; height: 20px; }
   #fav.on { color: #ffd479; opacity: 0.95; }
+  #tune.on { color: var(--accent); opacity: 0.95; }   /* lit when this favourite has its own look */
   #controls.no-image #dl, #controls.no-image #fav, #controls.no-image #tune { display: none; }
   body.br-light .ctl { color: rgba(20,20,20,0.6); filter: drop-shadow(0 1px 3px rgba(255,255,255,0.5)); }
   body.br-light .ctl:hover { background: rgba(255,255,255,0.32); }
@@ -1125,6 +1126,7 @@ function updateStar() {
   const fav = isFav(CURRENT);
   $("fav").classList.toggle("on", fav);
   $("tune").hidden = !fav;                 // the "customise" button rides alongside the star, favourites only
+  $("tune").classList.toggle("on", !!(favOf(CURRENT) && favOf(CURRENT).look));   // lit if this favourite has been adjusted
 }
 function toggleFav() {
   if (!CURRENT) return;
@@ -1188,13 +1190,13 @@ function tuneChanged() {
   L.tint = $("tp-tint").value; L.tintStrength = +$("tp-tintStrength").value;
   tuneTarget === "default" ? save() : saveFavs();
   applyBgStyle(); if (lastImg) analyzeContrast(lastImg);           // live preview on the current image
-  refreshDefaultLookBtn();
+  refreshDefaultLookBtn(); updateStar();
 }
 function resetTune() {
   if (tuneTarget === "default") { Object.assign(S.bg, { blur: 0, brightness: 70, tint: "#000000", tintStrength: 0 }); save(); }
   else { delete tuneTarget.look; saveFavs(); }                     // a favourite reset just drops back to the default
   showTuneValues(); applyBgStyle(); if (lastImg) analyzeContrast(lastImg);
-  refreshDefaultLookBtn();
+  refreshDefaultLookBtn(); updateStar();
 }
 /* The default look can't touch a favourite that has its own — disable it there so it doesn't seem to do nothing. */
 function refreshDefaultLookBtn() {

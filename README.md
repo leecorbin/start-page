@@ -56,15 +56,19 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - **Solid colour**
   - **Living wallpapers** — animated backgrounds that are themselves lazy-loaded
     plugins (`plugins/wp-*.js`, registered in `WALLPAPERS`): each appears as a
-    background source and only downloads when picked. First up: **Lava lamp** —
-    slow, ambient colour blobs on a dark base (low-res canvas + CSS blur), with
-    five palettes plus a **Brand** palette pulled from your saved colours,
-    Ambient/Lively/Bold motion, and an Auto/Light/Dark text override. It pauses
-    on a hidden tab and honours `prefers-reduced-motion`. Tune it with the
+    background source and only downloads when picked. Tune the current one with the
     **sliders button** over the wallpaper (which replaces the photo-only
-    download/star/customise controls). Wallpapers get a read-only window onto core
-    state (reduced-motion, the cached weather, and the on-screen UI rects), so a
-    future *weatherscape* can match the live forecast.
+    download/star/customise controls). They pause on a hidden tab and honour
+    `prefers-reduced-motion`, and get a read-only window onto core state
+    (reduced-motion, the cached weather, and the on-screen UI rects):
+    - **Lava lamp** — slow, ambient colour blobs on a dark base (low-res canvas +
+      CSS blur), with five palettes plus a **Brand** palette pulled from your saved
+      colours, Ambient/Lively/Bold motion, and an Auto/Light/Dark text override.
+    - **Weatherscape** — a stylised illustrated sky that **matches your live
+      weather** (via the keyless data the page already fetches): sun, a moon with
+      twinkling stars at night, drifting clouds, rain, snow and the odd lightning
+      flash. Track the live forecast or pin a scene; Sky Auto/Day/Night; Auto/
+      Light/Dark text.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.

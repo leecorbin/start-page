@@ -116,10 +116,6 @@
   .bang-chip img { width: 16px; height: 16px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
   .bang-chip .ql-glyph { font-size: 15px; }
   .bang-chip .ql-mono { width: 16px; height: 16px; font-size: 9px; }
-  .field.mode-plugin #plugin-chip { cursor: pointer; }                                   /* the chip doubles as a "back to search" button */
-  #plugin-chip:hover { background: rgba(91,155,255,0.34); border-color: rgba(91,155,255,0.7); }
-  #plugin-chip .chip-x { margin-left: 0.1rem; opacity: 0.65; font-size: 1.15em; line-height: 1; }
-  #plugin-chip:hover .chip-x { opacity: 1; }
   #q { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
   .hints { max-width: 92vw; text-align: center; line-height: 1.7; font-size: 0.8rem; color: var(--muted); text-shadow: var(--halo); }
   .hk { white-space: nowrap; }
@@ -756,11 +752,18 @@ function updateMode() {
   const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
   field.classList.toggle("mode-url", isUrl);
 }
-function updateClear() { const b = $("omni-clear"); if (b) b.hidden = !input.value; }   // a clear × appears only when the box has text
+function updateClear() {
+  const b = $("omni-clear"); if (!b) return;
+  b.hidden = activePlugin ? false : !input.value;        // in a plugin the × is always there; in search only when the box has text
+  const closes = activePlugin && !input.value;           // empty box in a plugin → the × closes the plugin
+  b.title = closes ? "Close (esc)" : "Clear";
+  b.setAttribute("aria-label", closes ? "Close" : "Clear");
+}
 $("omni-clear").onclick = (e) => {
   e.preventDefault(); e.stopPropagation();
+  if (activePlugin && !input.value) { closePlugin(); return; }     // first click clears the text, the next closes the plugin
   input.value = "";
-  input.dispatchEvent(new Event("input", { bubbles: true }));   // let the active plugin / search react, and hide the ×
+  input.dispatchEvent(new Event("input", { bubbles: true }));      // let the active plugin / search react; updateClear keeps the × in a plugin
   input.focus({ preventScroll: true });
 };
 input.addEventListener("input", (e) => {
@@ -945,10 +948,7 @@ async function openPlugin(def, initial) {
   const chip = $("plugin-chip");
   chip.innerHTML = "";
   chip.appendChild(makeGlyph(def.iconify ? { iconify: def.iconify } : { icon: def.icon }));
-  chip.appendChild(document.createTextNode(def.title));
-  const cx = document.createElement("span"); cx.className = "chip-x"; cx.textContent = "×"; chip.appendChild(cx);
-  chip.title = "Back to search (esc)"; chip.setAttribute("role", "button");
-  chip.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closePlugin(); };   // click the chip to leave the plugin — no keyboard needed
+  chip.appendChild(document.createTextNode(def.title));   // pure indicator now — the omnibox × (right) handles clear→close
   field.classList.remove("mode-url");
   field.classList.add("mode-plugin");
   markPluginBar();

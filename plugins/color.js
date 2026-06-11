@@ -19,6 +19,9 @@ const CSS = `
 .col-hex { font-size: 1.42rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
 .col-name { font-size: 0.78rem; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .col-heroBtns { display: flex; gap: 0.35rem; flex: none; }
+.col-picked { display: flex; flex-direction: column; gap: 3px; flex: none; }
+.col-pchip { width: 26px; height: 15px; padding: 0; border: none; border-radius: 4px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35); }
+.col-pchip.on { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 0 2px rgba(255,255,255,0.9); }
 .col-hbtn { font: inherit; font-size: 0.74rem; line-height: 1; padding: 0.36rem 0.62rem; border: none; border-radius: 8px; cursor: pointer; }
 .col-hbtn:disabled { opacity: 0.35; cursor: default; }
 .col-hint { text-transform: none; letter-spacing: 0; opacity: 0.7; }
@@ -256,6 +259,12 @@ const fmtChip = (k, disp, copy, title) => `<button type="button" data-copy="${co
 const copyLine = (k, v) => `<button type="button" class="col-copyline" data-copy="${v}" title="Copy ${v}"><span class="k">${k}</span><span class="v">${v}</span></button>`;
 const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-set="${hex}" title="${hex} — click to explore" style="background:${hex}"></button>`; };
 
+// after an eyedrop, offer both the shown (filtered) colour and the original photo pixel
+function pickedChips(hex) {
+  if (!picked || (hex !== picked.shown && hex !== picked.raw)) return "";
+  const chip = (col, lab, on) => `<button type="button" class="col-pchip${on ? " on" : ""}" data-set="${col}" title="${lab} — ${col}" style="background:${col}"></button>`;
+  return `<div class="col-picked">${chip(picked.shown, "Shown", hex === picked.shown)}${chip(picked.raw, "Original photo pixel", hex === picked.raw)}</div>`;
+}
 function buildInner(c, second) {
   const hex = toHex(c);
   const textC = contrast(c, { r: 0, g: 0, b: 0 }) >= contrast(c, { r: 255, g: 255, b: 255 }) ? "#000" : "#fff";
@@ -264,7 +273,7 @@ function buildInner(c, second) {
   const cw = contrast(c, { r: 255, g: 255, b: 255 }), ck = contrast(c, { r: 0, g: 0, b: 0 });
   const best = ck >= cw ? { t: "black", r: ck } : { t: "white", r: cw };
   let html = "";
-  html += `<div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div><div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>`;
+  html += `<div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div>${pickedChips(hex)}<div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>`;
   html += `<div class="col-formats">${fmtChip("RGB", rgbVals(c), fmtRgb(c))}${fmtChip("HSL", hslVals(c), fmtHsl(c))}${fmtChip("OKLCH", oklchVals(c), fmtOklch(c), "OKLCH — a modern, perceptually even colour space: lightness · chroma · hue (CSS Color 4). Click copies the CSS value.")}</div>`;
   html += `<div class="col-sec"><div class="col-h">Contrast</div><div class="col-contrast"><div class="col-ct" style="background:${hex};color:#fff"><b>Aa</b><span>${cw.toFixed(2)} · ${badge(cw)}</span></div><div class="col-ct" style="background:${hex};color:#000"><b>Aa</b><span>${ck.toFixed(2)} · ${badge(ck)}</span></div></div><div class="col-best">Best text: ${best.t} — ${best.r.toFixed(2)}:1 (${badge(best.r)})</div></div>`;
   html += `<div class="col-sec"><div class="col-h">Harmonies <span class="col-hint">· click to explore</span></div>` +
@@ -310,7 +319,8 @@ steps look equally different, which is why it's great for palettes and gradients
 
 let api = null, scrollEl = null, bodyEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0;
 let base = null, second = null, history = [];
-let pickEl = null, svEl = null, svhEl = null, hueEl = null, huehEl = null;          // visual picker
+let pickEl = null, svEl = null, svhEl = null, hueEl = null, huehEl = null, paletteBtn = null;   // visual picker
+let picked = null;                                                                  // last eyedrop result {shown, raw}
 let pickerHsv = { h: 0, s: 0, v: 0 }, dragging = false, rafId = 0, rafRgb = null;
 
 const MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));
@@ -383,6 +393,7 @@ function togglePicker() {
     if (!base) applyBase({ r: 91, g: 155, b: 255 });   // a pleasant seed from blank
     pickEl.hidden = false; syncPicker();
   } else pickEl.hidden = true;
+  if (paletteBtn) paletteBtn.classList.toggle("active", !pickEl.hidden);   // light the toggle while open
   fit();
 }
 
@@ -413,12 +424,15 @@ const plugin = {
     const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C22 6 17.5 2 12 2Z"></path><circle cx="6.5" cy="11.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="9.5" cy="7.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="14.5" cy="7.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="17.5" cy="11.5" r="1" fill="currentColor" stroke="none"></circle></svg>`;
     const PIPETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"></path><path d="M3 21v-3l9-9"></path><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path></svg>`;
     const btns = [{ title: "Visual colour picker", svg: PALETTE_SVG, onClick: togglePicker }];
-    if (api.hasWallpaper && api.hasWallpaper()) btns.push({ title: "Pick a colour from the wallpaper", svg: PIPETTE_SVG, onClick: () => api.pickFromWallpaper && api.pickFromWallpaper((hex) => setBase(parseColor(hex), true)) });
-    if (api.setButtons) api.setButtons(btns);
+    if (api.hasWallpaper && api.hasWallpaper()) btns.push({ title: "Pick a colour from the wallpaper", svg: PIPETTE_SVG,
+      onClick: () => api.pickFromWallpaper && api.pickFromWallpaper((c) => { picked = { shown: c.shown, raw: c.raw }; setBase(parseColor(c.shown), true); }) });
+    const made = api.setButtons ? api.setButtons(btns) : [];
+    paletteBtn = made[0] || null;
     fit();
   },
   onInput(text) {
     const t = (text || "").trim();
+    picked = null;   // typing chooses a fresh colour; drop the eyedrop pair
     if (!t) { base = null; second = null; history = []; render(); return; }
     const colors = findColors(t);
     if (!colors.length) { if (!base) render(); return; }   // keep last good while mid-type
@@ -431,8 +445,8 @@ const plugin = {
   unmount() {
     if (styleEl) styleEl.remove();
     clearTimeout(toastT); if (rafId) cancelAnimationFrame(rafId); rafId = 0;
-    api = scrollEl = bodyEl = innerEl = toastEl = styleEl = pickEl = svEl = svhEl = hueEl = huehEl = null;
-    base = null; second = null; history = []; dragging = false;
+    api = scrollEl = bodyEl = innerEl = toastEl = styleEl = pickEl = svEl = svhEl = hueEl = huehEl = paletteBtn = null;
+    base = null; second = null; history = []; dragging = false; picked = null;
   },
 };
 export default plugin;

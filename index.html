@@ -87,6 +87,7 @@
   .plugin-btns:empty { margin-left: 0; }
   .plugin-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; background: none; border: none; color: var(--fg); opacity: 0.5; cursor: pointer; border-radius: 8px; transition: opacity 0.15s ease, background 0.15s ease; }
   .plugin-btn:hover, body.eyedropping .plugin-btn { opacity: 0.95; background: rgba(255,255,255,0.12); }
+  .plugin-btn.active { opacity: 1; background: rgba(91,155,255,0.26); color: var(--accent); }
   .plugin-btn svg { width: 17px; height: 17px; }
   /* Light glass stays — on a light background the *content* flips dark (readable) instead of the glass. Plugins force dark (below). */
   body.lc-light .field:not(.mode-plugin) #q { color: #15181f; }
@@ -158,6 +159,20 @@
   .plug-item img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
   .plug-item:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   body.lc-light .plug-item img { filter: grayscale(1) brightness(0) drop-shadow(0 1px 2px rgba(255,255,255,0.5)); }
+  /* row size variants (small = base); "off" hides via the hidden attr */
+  #links[hidden] { display: none; }
+  #frequent.size-medium, #plugin-bar.size-medium { gap: 1.0rem; }
+  #frequent.size-large, #plugin-bar.size-large { gap: 1.2rem; }
+  #frequent.size-medium .freq-item, #plugin-bar.size-medium .plug-item { width: 40px; height: 40px; }
+  #frequent.size-large .freq-item, #plugin-bar.size-large .plug-item { width: 52px; height: 52px; }
+  #frequent.size-medium .freq-item img, #plugin-bar.size-medium .plug-item img { width: 24px; height: 24px; }
+  #frequent.size-large .freq-item img, #plugin-bar.size-large .plug-item img { width: 32px; height: 32px; }
+  /* segmented control [Off|Small|Medium|Large] */
+  .seg { display: flex; width: 100%; border: 1px solid var(--field-border); border-radius: 8px; overflow: hidden; margin: 0.15rem 0 0.2rem; }
+  .seg button { flex: 1; padding: 0.34rem 0.2rem; background: none; border: none; border-left: 1px solid var(--field-border); color: var(--muted); font: inherit; font-size: 0.78rem; cursor: pointer; transition: background 0.12s ease, color 0.12s ease; }
+  .seg button:first-child { border-left: none; }
+  .seg button:hover { background: rgba(255,255,255,0.07); }
+  .seg button.on { background: var(--accent); color: #fff; }
   #credit { position: fixed; left: 14px; bottom: 12px; z-index: 2; font-size: 0.72rem; color: rgba(255,255,255,0.72); text-shadow: 0 1px 8px rgba(0,0,0,0.6); opacity: 0; transition: opacity 0.4s ease; }
   #credit.show { opacity: 1; }
   #credit a { color: inherit; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.3); }
@@ -436,7 +451,7 @@
     <div class="tabpane hidden" id="tab-links">
       <div class="group">
         <label class="h">Quick links</label>
-        <div class="row"><span>Icon size</span><select id="s-iconSize"><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select></div>
+        <div class="seg" id="seg-links"><button type="button" data-val="off">Off</button><button type="button" data-val="small">Small</button><button type="button" data-val="medium">Medium</button><button type="button" data-val="large">Large</button></div>
         <div id="link-editor"></div>
         <button class="minibtn" id="link-add" style="width:100%;margin-top:0.2rem;">+ Add link</button>
       </div>
@@ -448,10 +463,14 @@
       </div>
       <div class="group">
         <label class="h">Frequent sites</label>
-        <div class="row"><span>Show frequent row</span><input id="s-showFrequent" type="checkbox" /></div>
-        <div class="row"><span>Show plugins row</span><input id="s-showPlugins" type="checkbox" /></div>
+        <div class="seg" id="seg-frequent"><button type="button" data-val="off">Off</button><button type="button" data-val="small">Small</button><button type="button" data-val="medium">Medium</button><button type="button" data-val="large">Large</button></div>
         <div class="row"><span>Min visits</span><select id="s-freqMin"><option value="2">2</option><option value="3">3</option><option value="5">5</option><option value="10">10</option></select></div>
         <p class="grp-note">Auto-surfaced from sites you visit a lot (and haven't pinned above). Hover an icon and tap × to forget it.</p>
+      </div>
+      <div class="group">
+        <label class="h">Plugins</label>
+        <div class="seg" id="seg-plugins"><button type="button" data-val="off">Off</button><button type="button" data-val="small">Small</button><button type="button" data-val="medium">Medium</button><button type="button" data-val="large">Large</button></div>
+        <p class="grp-note">One-click launchers under the search box for your installed plugins.</p>
       </div>
       <div class="group">
         <label class="h">Plugins</label>
@@ -475,7 +494,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, iconSize: "small", showFrequent: true, freqMinVisits: 3, showPlugins: false, disabledPlugins: [],
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, linksSize: "small", frequentSize: "small", freqMinVisits: 3, pluginsSize: "off", disabledPlugins: [],
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -504,11 +523,16 @@ const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } 
 
 function load() {
   const r = readLS(K.set) || {};
-  return { ...DEFAULTS, ...r,
+  const s = { ...DEFAULTS, ...r,
     bg: { ...DEFAULTS.bg, ...(r.bg || {}) },
     weather: { ...DEFAULTS.weather, ...(r.weather || {}) },
     links: r.links || DEFAULTS.links,
     bangs: r.bangs || DEFAULTS.bangs };
+  // migrate the row controls → Off/Small/Medium/Large
+  if (r.linksSize === undefined && r.iconSize !== undefined) s.linksSize = r.iconSize;
+  if (r.frequentSize === undefined && typeof r.showFrequent === "boolean") s.frequentSize = r.showFrequent ? "small" : "off";
+  if (r.pluginsSize === undefined && typeof r.showPlugins === "boolean") s.pluginsSize = r.showPlugins ? "small" : "off";
+  return s;
 }
 let S = load();
 if (S.bg.provider === "picsum") S.bg.provider = "photos";                                                  // migrate to unified photos + new-images slider
@@ -859,9 +883,9 @@ function setPluginHints(pairs) {
 }
 /* A plugin's mount() can hang buttons off the omnibox's right edge; the core just renders them. */
 function setPluginButtons(defs) {
-  const c = $("plugin-btns"); if (!c) return;
+  const c = $("plugin-btns"); if (!c) return [];
   c.innerHTML = "";
-  (defs || []).forEach((d) => {
+  return (defs || []).map((d) => {                       // returns the elements so a plugin can toggle their state
     const b = document.createElement("button");
     b.type = "button"; b.className = "plugin-btn";
     if (d.title) b.title = d.title;
@@ -869,6 +893,7 @@ function setPluginButtons(defs) {
     b.innerHTML = d.svg || "";
     b.onclick = (e) => { e.preventDefault(); e.stopPropagation(); try { d.onClick(); } catch {} };
     c.appendChild(b);
+    return b;
   });
 }
 async function openPlugin(def, initial) {
@@ -898,7 +923,7 @@ async function openPlugin(def, initial) {
       close: closePlugin,
       setButtons: setPluginButtons,                                       // own buttons on the omnibox right edge
       hasWallpaper: () => !!lastImg,                                       // is there an image to sample?
-      pickFromWallpaper: (cb) => { if (picking) { endPick(); return; } if (lastImg) beginPick(cb, null); },
+      pickFromWallpaper: (cb) => { if (picking) { endPick(); return; } if (lastImg) beginPick((raw) => cb({ raw, shown: shownColour(raw) }), null); },
     };
     pluginContent.innerHTML = "";
     mod.mount(pluginContent, api);
@@ -1269,6 +1294,17 @@ function samplePixel(cx, cy) {
   const d = ctx.getImageData(0, 0, 1, 1).data;
   return "#" + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, "0")).join("");
 }
+function shownColour(rawHex) {                                     // raw image pixel → roughly what's on screen (brightness + tint applied; blur ignored)
+  const m = /^#?([0-9a-f]{6})$/i.exec(rawHex || ""); if (!m) return rawHex;
+  const L = effectiveLook(), n = parseInt(m[1], 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const br = (L.brightness == null ? 100 : L.brightness) / 100; r *= br; g *= br; b *= br;
+  const a = (L.tintStrength || 0) / 100;
+  if (a > 0) { const t = parseInt((L.tint || "#000000").replace(/^#/, ""), 16);
+    r = r * (1 - a) + ((t >> 16) & 255) * a; g = g * (1 - a) + ((t >> 8) & 255) * a; b = b * (1 - a) + (t & 255) * a; }
+  const cl = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return "#" + cl(r) + cl(g) + cl(b);
+}
 $("tp-pick").onclick = (e) => {                                    // tune popover → pick a tint
   e.stopPropagation();
   if (picking) { endPick(); return; }
@@ -1418,10 +1454,15 @@ function makeGlyph(l) {
   };
   return img;
 }
-function applyIconSize() {
-  const el = $("links");
-  el.classList.remove("size-small", "size-medium", "size-large");
-  el.classList.add("size-" + (S.iconSize || "small"));
+function applyRowSize(nav, size) {
+  nav.classList.remove("size-small", "size-medium", "size-large");
+  if (size && size !== "off") nav.classList.add("size-" + size);
+}
+function bindSeg(id, key, after) {                                 // wire an [Off|Small|Medium|Large] segmented control to a setting
+  const seg = $(id); if (!seg) return;
+  const sync = () => seg.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.val === S[key]));
+  seg.querySelectorAll("button").forEach(b => b.onclick = () => { S[key] = b.dataset.val; save(); sync(); if (after) after(); });
+  sync();
 }
 function forgetHost(host) {
   const h = readLS(K.hist) || [];
@@ -1429,7 +1470,8 @@ function forgetHost(host) {
 }
 function renderFrequent() {
   const nav = $("frequent"); if (!nav) return; nav.innerHTML = "";
-  if (!S.showFrequent) { nav.hidden = true; return; }
+  applyRowSize(nav, S.frequentSize);
+  if (S.frequentSize === "off") { nav.hidden = true; return; }
   const hosts = {};
   for (const e of (readLS(K.hist) || [])) { if (!e.host) continue; const h = (hosts[e.host] = hosts[e.host] || { host: e.host, n: 0, t: 0 }); h.n += e.n; h.t = Math.max(h.t, e.t); }
   const pinned = new Set((S.links || []).map(l => hostOf(l.url)));
@@ -1449,7 +1491,8 @@ function renderFrequent() {
 /* Optional launcher row: one icon per installed plugin, straight from the registry (generic, no per-plugin code). */
 function renderPluginBar() {
   const nav = $("plugin-bar"); if (!nav) return; nav.innerHTML = "";
-  if (!S.showPlugins) { nav.hidden = true; return; }
+  applyRowSize(nav, S.pluginsSize);
+  if (S.pluginsSize === "off") { nav.hidden = true; return; }
   const list = PLUGINS.filter(p => !(S.disabledPlugins || []).includes(p.id));
   list.forEach(def => {
     const b = document.createElement("button");
@@ -1475,8 +1518,8 @@ function renderLinks() {
     if (label) { const tip = document.createElement("span"); tip.className = "ql-tip"; tip.textContent = label; a.appendChild(tip); }
     nav.appendChild(a);
   });
-  nav.hidden = !(S.links && S.links.some(l => l.url));
-  applyIconSize();
+  applyRowSize(nav, S.linksSize);
+  nav.hidden = S.linksSize === "off" || !(S.links && S.links.some(l => l.url));
   renderFrequent();
   renderPluginBar();
 }
@@ -1572,7 +1615,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-iconSize", S.iconSize); set("s-showFrequent", S.showFrequent); set("s-freqMin", S.freqMinVisits); set("s-showPlugins", S.showPlugins);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-freqMin", S.freqMinVisits);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   syncDataWhen();
@@ -1624,10 +1667,10 @@ function bindControls() {
   $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
   $("s-siteHistory").onchange = () => { S.siteHistory = $("s-siteHistory").checked; save(); };
   $("s-clearHistory").onclick = () => { localStorage.removeItem(K.hist); const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); renderFrequent(); };
-  $("s-showFrequent").onchange = () => { S.showFrequent = $("s-showFrequent").checked; save(); renderFrequent(); };
-  $("s-showPlugins").onchange = () => { S.showPlugins = $("s-showPlugins").checked; save(); renderPluginBar(); };
   $("s-freqMin").onchange = () => { S.freqMinVisits = +$("s-freqMin").value; save(); renderFrequent(); };
-  $("s-iconSize").onchange = () => { S.iconSize = $("s-iconSize").value; save(); applyIconSize(); };
+  bindSeg("seg-links", "linksSize", renderLinks);
+  bindSeg("seg-frequent", "frequentSize", renderFrequent);
+  bindSeg("seg-plugins", "pluginsSize", renderPluginBar);
   $("s-claudeTarget").onchange = () => { S.claudeTarget = $("s-claudeTarget").value; save(); };
   $("s-engine").onchange = () => { S.searchEngine = $("s-engine").value; save(); };
 
@@ -1654,7 +1697,12 @@ $("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.t
 // otherwise read as an outside click and dismiss the panel.)
 panel.addEventListener("click", (e) => e.stopPropagation());
 function closePanel() { panel.classList.remove("open"); closeTune(); }   // dismissing the panel also drops the look popover
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
+document.addEventListener("keydown", (e) => {              // Esc works even when focus has left the box
+  if (e.key !== "Escape") return;
+  if (!$("help").hidden) { closeHelp(); return; }
+  if (activePlugin) { closePlugin(); return; }
+  closePanel();
+});
 document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) closePanel(); });
 document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });
 

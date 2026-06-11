@@ -71,7 +71,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   visit most (above a min-visits threshold, excluding ones you've already pinned),
   with the same brand icons; hover an icon and tap × to forget it.
 - 🧩 **Plugins row** — an optional row of one-click launchers for your installed
-  plugins (calculator, colour…); toggle it in Settings.
+  plugins (calculator, colour…). Each of the three icon rows (quick links, frequent,
+  plugins) has its own **Off / Small / Medium / Large** control in Settings.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always
@@ -85,8 +86,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   - 🧮 **Calculator** (`==`) — a safe, no-`eval` expression engine with **exact
     fractions** (`1/3 + 1/6` → ½ = 0.5), pretty-rendered maths (stacked
     fractions, superscript exponents, radical signs), `%`/`of`, factorials,
-    trig/log (radians), constants `π`/`e`, an `ans` variable, and a tape —
-    click any entry to copy its result. Set **variables** (`x = 5`, `rate = 0.05`)
+    trig/log (radians), constants `π`/`e`, an `ans` variable, **hex/binary/octal**
+    (`0xFF + 1`, with a click-to-copy bases readout on whole-number results), and a
+    tape — click any entry to copy its result. Set **variables** (`x = 5`, `rate = 0.05`)
     and use them in later expressions; type **`y = x^2 − 3`** (or any expression
     with an unset `x`) and the panel grows into a **live graph** — gridlines and
     axes, asymptote-aware, zoomable via the +/− buttons, scroll, or trackpad pinch.

@@ -1,19 +1,21 @@
-/* start-page plugin: Dev tools (trigger ";;")
-   Keyless developer utilities — number bases + bitwise + an interactive bit grid,
-   base64 / URL encode-decode, Unix timestamps, UUID v4, and SHA hashes. All
-   client-side, no network. Part of start-page (MIT). */
+/* start-page plugin: Tools (trigger "<>")
+   Keyless, offline "type-and-route" utilities — number bases + bitwise + a clickable
+   bit grid, UUIDs, Unix timestamps, Base64 / URL encode-decode, SHA hashes, and (for
+   any plain text) every case, a slug, reverse, trim and counts. Click any value to
+   copy. Merges the old Dev tools + Text plugins. Part of start-page (MIT). */
 
 const CSS = `
-.devp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
-.devp-inner { padding: 0.55rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
-.dv-ph { padding: 0.6rem 0.3rem; color: rgba(244,246,251,0.45); font-size: 0.85rem; line-height: 1.85; }
-.dv-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
-.dv-sec { display: flex; flex-direction: column; gap: 0.32rem; }
-.dv-h { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); display: flex; align-items: center; gap: 0.5rem; }
-.dv-line { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.34rem 0.6rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
-.dv-line:hover { background: rgba(255,255,255,0.12); }
-.dv-line .k { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); flex: none; }
+.toolsp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
+.toolsp-inner { padding: 0.55rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.tl-ph { padding: 0.6rem 0.3rem; color: rgba(244,246,251,0.45); font-size: 0.85rem; line-height: 1.85; }
+.tl-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
+.dv-sec, .tx-sec { display: flex; flex-direction: column; gap: 0.32rem; }
+.dv-h, .tx-h { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); display: flex; align-items: center; gap: 0.5rem; }
+.dv-line, .tx-line { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.34rem 0.6rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+.dv-line:hover, .tx-line:hover { background: rgba(255,255,255,0.12); }
+.dv-line .k, .tx-line .k { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); flex: none; }
 .dv-line .v { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-line .v { font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dv-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .dv-grp { display: flex; flex-direction: column; gap: 3px; align-items: center; }
 .dv-byte { display: flex; gap: 2px; }
@@ -25,19 +27,20 @@ const CSS = `
 .dv-err { color: rgba(244,246,251,0.5); font-size: 0.85rem; padding: 0.35rem 0.3rem; line-height: 1.6; }
 .dv-mini { background: rgba(255,255,255,0.1); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 6px; color: var(--fg); font: inherit; font-size: 0.7rem; text-transform: none; letter-spacing: 0; padding: 0.05rem 0.45rem; cursor: pointer; }
 .dv-mini:hover { background: rgba(255,255,255,0.18); }
-.dv-toast { position: absolute; left: 50%; bottom: 11px; transform: translateX(-50%) translateY(8px); background: rgba(12,16,24,0.94); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); color: var(--fg, #f4f6fb); font-size: 0.77rem; padding: 0.3rem 0.75rem; border-radius: 999px; opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none; white-space: nowrap; }
-.dv-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.tx-stats { font-size: 0.82rem; color: var(--muted, rgba(244,246,251,0.7)); font-variant-numeric: tabular-nums; }
+.tl-toast { position: absolute; left: 50%; bottom: 11px; transform: translateX(-50%) translateY(8px); background: rgba(12,16,24,0.94); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); color: var(--fg, #f4f6fb); font-size: 0.77rem; padding: 0.3rem 0.75rem; border-radius: 999px; opacity: 0; transition: opacity 0.18s ease, transform 0.18s ease; pointer-events: none; white-space: nowrap; }
+.tl-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 `;
 
-const PH_HTML = `<div class="dv-ph">Developer tools — try:<br>
+const PH_HTML = `<div class="tl-ph">Type, and it routes to the right tool:<br>
 <code>0xF0 &amp; 0x0F</code> · <code>1 &lt;&lt; 8</code> — bits &amp; bases<br>
-<code>uuid</code> · <code>uuid 5</code> — generate IDs<br>
-<code>ts 1718000000</code> · <code>now</code> — timestamps<br>
-<code>b64 hello</code> · <code>url a b&amp;c</code> — encode / decode<br>
-<code>sha256 hello</code> — hashes</div>`;
+<code>uuid</code> · <code>ts 1718000000</code> · <code>now</code> — IDs &amp; time<br>
+<code>b64 hello</code> · <code>url a b&amp;c</code> · <code>sha256 hi</code> — encode &amp; hash<br>
+…or paste any <strong>text</strong> for every case, a slug, reverse, trim &amp; counts.</div>`;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const line = (k, v) => `<button type="button" class="dv-line" data-copy="${esc(v)}"><span class="k">${k}</span><span class="v">${esc(v)}</span></button>`;
+const copyLine = (k, v) => `<button type="button" class="tx-line" data-copy="${esc(v)}"><span class="k">${k}</span><span class="v">${esc(v) || "—"}</span></button>`;
 
 /* ============================ bitwise evaluator (BigInt) ============================ */
 function tokB(src) {
@@ -84,7 +87,7 @@ function evalBits(src) {
   return v;
 }
 
-/* ============================ tools ============================ */
+/* ============================ dev tools ============================ */
 function bitGrid(v, nbits) {
   let groups = "";
   for (let hi = nbits - 1; hi >= 0; hi -= 4) {
@@ -143,7 +146,7 @@ async function sha(algo, text) {
 }
 function hashTool(algo, text) {
   if (!text) return `<div class="dv-err">Type text after <span class="dv-mono">${algo.toLowerCase().replace("-", "")}</span> to hash it.</div>`;
-  const id = "dv-hash-" + (++hashId), g = gen;
+  const id = "tl-hash-" + (++hashId), g = gen;
   setTimeout(async () => {
     try { const h = await sha(algo, text); if (g === gen) { const el = document.getElementById(id); if (el) { el.textContent = h; el.closest(".dv-line").setAttribute("data-copy", h); } } } catch {}
   }, 0);
@@ -156,7 +159,7 @@ function tsTool(t) {
     const m = t.match(/^ts\s+(.+)$/i);
     if (!m) return `<div class="dv-err">Try <span class="dv-mono">ts 1718000000</span> or <span class="dv-mono">now</span>.</div>`;
     const a = m[1].trim();
-    if (/^\d+$/.test(a)) ms = a.length > 11 ? +a : +a * 1000;            // long → already ms, else seconds
+    if (/^\d+$/.test(a)) ms = a.length > 11 ? +a : +a * 1000;
     else { const p = Date.parse(a); if (isNaN(p)) return `<div class="dv-err">Couldn't parse that date.</div>`; ms = p; }
   }
   const d = new Date(ms);
@@ -165,35 +168,69 @@ function tsTool(t) {
     + line("ISO", d.toISOString()) + line("LOCAL", d.toLocaleString()) + `</div>`;
 }
 
+/* ============================ text transforms ============================ */
+const cap = (w) => (w ? w[0].toUpperCase() + w.slice(1).toLowerCase() : w);
+function words(s) {
+  return s.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+const CASES = {
+  "UPPERCASE": (s) => s.toUpperCase(),
+  "lowercase": (s) => s.toLowerCase(),
+  "Title Case": (s) => s.toLowerCase().replace(/(^|\s)(\p{L})/gu, (m, p, c) => p + c.toUpperCase()),
+  "Sentence case": (s) => s.toLowerCase().replace(/(^\s*|[.!?]+\s+)(\p{L})/gu, (m, p, c) => p + c.toUpperCase()),
+  "camelCase": (s) => words(s).map((x, i) => (i ? cap(x) : x.toLowerCase())).join(""),
+  "PascalCase": (s) => words(s).map(cap).join(""),
+  "snake_case": (s) => words(s).map((x) => x.toLowerCase()).join("_"),
+  "kebab-case": (s) => words(s).map((x) => x.toLowerCase()).join("-"),
+  "CONSTANT_CASE": (s) => words(s).map((x) => x.toUpperCase()).join("_"),
+};
+const slug = (s) => s.trim().toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+const reverse = (s) => [...s].reverse().join("");
+const trimmed = (s) => s.trim().replace(/\s+/g, " ");
+const nospace = (s) => s.replace(/\s+/g, "");
+function textHtml(s) {
+  let html = `<div class="tx-sec"><div class="dv-h">Case</div>` + Object.entries(CASES).map(([k, fn]) => copyLine(k, fn(s))).join("") + `</div>`;
+  html += `<div class="tx-sec"><div class="dv-h">Transform</div>${copyLine("Slug", slug(s))}${copyLine("Reverse", reverse(s))}${copyLine("Trimmed", trimmed(s))}${copyLine("No spaces", nospace(s))}</div>`;
+  const chars = [...s].length, wc = words(s).length, bytes = new TextEncoder().encode(s).length, lines = s.split(/\r\n|\r|\n/).length;
+  html += `<div class="tx-sec"><div class="dv-h">Count</div><div class="tx-stats">${chars} chars · ${wc} words${lines > 1 ? " · " + lines + " lines" : ""} · ${bytes} bytes</div></div>`;
+  return html;
+}
+
+/* ============================ router ============================ */
 const after = (t) => t.replace(/^\S+\s?/, "");
 function route(input) {
-  const t = (input || "").trim();
-  if (!t) return PH_HTML;
-  const low = t.toLowerCase();
-  if (/^uuid\b/.test(low)) return uuidTool(t);
-  if (/^now\b/.test(low) || /^ts\b/.test(low)) return tsTool(t);
-  if (/^(b64|base64)\b/.test(low)) return b64Tool(after(t));
-  if (/^url\b/.test(low)) return urlTool(after(t));
-  if (/^sha-?256\b/.test(low)) return hashTool("SHA-256", after(t));
-  if (/^sha-?1\b/.test(low)) return hashTool("SHA-1", after(t));
-  try { return numberTool(evalBits(t)); } catch {}
-  return `<div class="dv-err">Not recognised. Try a number/expression (<span class="dv-mono">0xFF &amp; 0x0F</span>), or <span class="dv-mono">uuid · ts · now · b64 · url · sha256</span>.</div>`;
+  if (!input) return PH_HTML;
+  const t = input.trim();
+  if (t) {
+    const low = t.toLowerCase();
+    if (/^uuid\b/.test(low)) return uuidTool(t);
+    if (/^now\b/.test(low) || /^ts\b/.test(low)) return tsTool(t);
+    if (/^(b64|base64)\b/.test(low)) return b64Tool(after(t));
+    if (/^url\b/.test(low)) return urlTool(after(t));
+    if (/^sha-?256\b/.test(low)) return hashTool("SHA-256", after(t));
+    if (/^sha-?1\b/.test(low)) return hashTool("SHA-1", after(t));
+    try { return numberTool(evalBits(t)); } catch {}     // a number/bitwise expression?
+  }
+  return textHtml(input);                                  // otherwise treat it as text (raw — leading/trailing space matters)
 }
 
 /* ============================ plugin ============================ */
 const HELP = `
-<p>Type a developer task straight into the box — it routes to the right tool. All keyless and offline.</p>
-<h3>Tools</h3>
+<p>One box, the right tool — type a command and it routes; type anything else and it's treated as text.
+All keyless and offline; click any value to copy.</p>
+<h3>Developer</h3>
 <table class="help-keys">
-  <tr><td><kbd>0x 0b 0o</kbd></td><td>numbers in any base + bitwise <kbd>&amp; | ^ ~ &lt;&lt; &gt;&gt;</kbd> — shows all bases and a bit grid you can click to toggle</td></tr>
-  <tr><td><kbd>uuid</kbd></td><td>generate UUID v4 (<kbd>uuid 5</kbd> for five; ↻ for fresh ones)</td></tr>
+  <tr><td><kbd>0x 0b 0o</kbd></td><td>numbers in any base + bitwise <kbd>&amp; | ^ ~ &lt;&lt; &gt;&gt;</kbd>, with a bit grid you can click to toggle</td></tr>
+  <tr><td><kbd>uuid</kbd></td><td>UUID v4 (<kbd>uuid 5</kbd> for five; ↻ for fresh ones)</td></tr>
   <tr><td><kbd>ts · now</kbd></td><td>Unix timestamp ↔ date — <kbd>ts 1718000000</kbd>, <kbd>ts 2026-06-11</kbd>, <kbd>now</kbd></td></tr>
-  <tr><td><kbd>b64 · url</kbd></td><td>Base64 and URL encode/decode — <kbd>b64 hello</kbd>, <kbd>url a b&amp;c</kbd></td></tr>
-  <tr><td><kbd>sha256 · sha1</kbd></td><td>hashes via the browser's crypto — <kbd>sha256 hello</kbd></td></tr>
+  <tr><td><kbd>b64 · url</kbd></td><td>Base64 and URL encode/decode</td></tr>
+  <tr><td><kbd>sha256 · sha1</kbd></td><td>hashes via the browser's crypto</td></tr>
 </table>
+<h3>Text</h3>
 <table class="help-keys">
-  <tr><td><kbd>click</kbd></td><td>copy any value</td></tr>
-  <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
+  <tr><td><kbd>case</kbd></td><td>UPPER · lower · Title · Sentence · camelCase · snake_case · kebab-case · CONSTANT_CASE</td></tr>
+  <tr><td><kbd>slug · reverse · trim</kbd></td><td>URL slug, reverse, collapse/strip whitespace</td></tr>
+  <tr><td><kbd>count</kbd></td><td>characters, words, lines and UTF-8 bytes</td></tr>
 </table>`;
 
 let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0, gen = 0, hashId = 0;
@@ -206,13 +243,13 @@ function toast(msg) {
 }
 function render(input) {
   gen++;
-  innerEl.innerHTML = input && input.trim() ? route(input) : PH_HTML;
+  innerEl.innerHTML = route(input || "");
   if (scrollEl) scrollEl.scrollTop = 0;
   fit();
 }
 function onClick(e) {
   const bit = e.target.closest("[data-bit]");
-  if (bit) {                                                          // flip a bit → new value back into the box
+  if (bit) {
     try { const i = +bit.dataset.bit, cur = evalBits(api.getInput()); const nv = cur ^ (1n << BigInt(i)); api.setInput("0x" + (nv < 0n ? 0n : nv).toString(16)); render(api.getInput()); } catch {}
     return;
   }
@@ -222,15 +259,15 @@ function onClick(e) {
 }
 
 const plugin = {
-  hints: [["uuid", "ids"], ["ts", "time"], ["b64·url·sha", "text"], ["& | ^ <<", "bits"]],
+  hints: [["type text", "→ cases"], ["uuid·ts·b64·sha", "dev"], ["& | ^ <<", "bits"]],
   help: HELP,
   mount(root, hostApi) {
     api = hostApi;
     styleEl = document.createElement("style"); styleEl.textContent = CSS; document.head.appendChild(styleEl);
-    root.innerHTML = `<div class="devp"><div class="devp-inner"></div></div><div class="dv-toast"></div>`;
-    scrollEl = root.querySelector(".devp");
-    innerEl = root.querySelector(".devp-inner");
-    toastEl = root.querySelector(".dv-toast");
+    root.innerHTML = `<div class="toolsp"><div class="toolsp-inner"></div></div><div class="tl-toast"></div>`;
+    scrollEl = root.querySelector(".toolsp");
+    innerEl = root.querySelector(".toolsp-inner");
+    toastEl = root.querySelector(".tl-toast");
     innerEl.innerHTML = PH_HTML;
     root.addEventListener("click", onClick);
     fit();

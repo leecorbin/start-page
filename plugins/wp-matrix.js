@@ -11,9 +11,9 @@ const PALETTES = {
   violet: { name: "Violet", base: [9, 4, 18],  lit: "#a45ce0", head: "#e8ccff" },
 };
 const INTENSITY = {                       // idle = chance a column skips a frame (higher = slower/sparser); fade = trail length
-  ambient: { name: "Ambient", idle: 0.55, fade: 0.045 },
-  lively:  { name: "Lively",  idle: 0.30, fade: 0.060 },
-  bold:    { name: "Bold",    idle: 0.10, fade: 0.085 },
+  ambient: { name: "Ambient", idle: 0.88, fade: 0.030 },
+  lively:  { name: "Lively",  idle: 0.62, fade: 0.050 },
+  bold:    { name: "Bold",    idle: 0.28, fade: 0.075 },
 };
 const DEFAULTS = { palette: "green", intensity: "ambient", text: "auto" };
 let SET = (() => { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(MKEY)) || {}); } catch { return { ...DEFAULTS }; } })();

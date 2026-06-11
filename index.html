@@ -909,10 +909,9 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 const PLUGINS = [
   { id: "calc", trigger: "==", title: "Calculator", icon: "=", iconify: "lucide:calculator", height: 210, src: "./plugins/calc.js" },
   { id: "color", trigger: "##", title: "Colour", icon: "#", iconify: "lucide:palette", height: 96, src: "./plugins/color.js" },
-  { id: "dev", trigger: ";;", title: "Dev tools", icon: ">", iconify: "lucide:terminal", height: 96, src: "./plugins/dev.js" },
-  { id: "text", trigger: ",,", title: "Text", icon: "T", iconify: "lucide:type", height: 96, src: "./plugins/text.js" },
+  { id: "tools", trigger: "<>", title: "Tools", icon: ">", iconify: "lucide:wrench", height: 96, src: "./plugins/tools.js" },
   { id: "dict", trigger: "??", title: "Dictionary", icon: "?", iconify: "lucide:book-open", height: 96, src: "./plugins/dict.js" },
-  { id: "img", trigger: "::", title: "Images", icon: "▦", iconify: "lucide:image", height: 120, src: "./plugins/img.js" },
+  { id: "img", trigger: "[]", title: "Images", icon: "▦", iconify: "lucide:image", height: 120, src: "./plugins/img.js" },
   { id: "map", trigger: "@@", title: "Map", icon: "@", iconify: "lucide:map-pin", height: 120, src: "./plugins/map.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;

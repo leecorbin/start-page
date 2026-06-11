@@ -13,17 +13,22 @@ const CSS = `
 .mapx-name { font-size: 0.92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mapx-sub { color: var(--muted, rgba(244,246,251,0.6)); font-weight: 400; font-size: 0.82rem; }
 .mapx-spacer { flex: 1; }
+.mapx-seg { display: inline-flex; flex: none; background: rgba(255,255,255,0.06); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 8px; padding: 2px; gap: 2px; }
+.mapx-seg button { border: none; background: none; color: var(--muted, rgba(244,246,251,0.6)); font: inherit; font-size: 0.72rem; padding: 0.12rem 0.45rem; border-radius: 6px; cursor: pointer; }
+.mapx-seg button.on { background: rgba(255,255,255,0.18); color: var(--fg, #f4f6fb); }
 .mapx-btn { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--field-border, rgba(255,255,255,0.18)); background: rgba(255,255,255,0.06); color: var(--fg); cursor: pointer; text-decoration: none; }
 .mapx-btn:hover { background: rgba(255,255,255,0.14); }
 .mapx-btn svg { width: 15px; height: 15px; }
-.mapx-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; padding: 0 0.6rem 0.45rem; }
-.mapx-chip { background: rgba(255,255,255,0.07); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 999px; color: var(--fg); font: inherit; font-size: 0.78rem; padding: 0.1rem 0.55rem; cursor: pointer; }
+.mapx-chips { display: flex; gap: 0.35rem; flex-wrap: nowrap; overflow-x: auto; padding: 0 0.6rem 0.45rem; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.mapx-chips::-webkit-scrollbar { height: 5px; }
+.mapx-chips::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); border-radius: 3px; }
+.mapx-chips:empty { display: none; }
+.mapx-chip { flex: none; white-space: nowrap; background: rgba(255,255,255,0.07); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 999px; color: var(--fg); font: inherit; font-size: 0.78rem; padding: 0.1rem 0.55rem; cursor: pointer; }
 .mapx-chip:hover { background: var(--accent, #5b9bff); border-color: var(--accent, #5b9bff); color: #fff; }
 .mapx-slot { flex: 1; min-height: 0; padding: 0 0.6rem 0.6rem; }
 .mapx-map { width: 100%; height: 100%; border-radius: 11px; overflow: hidden; background: #11151d; }
 .mapx-map.leaflet-container { background: #11151d; font: inherit; }   /* Leaflet adds .leaflet-container to this same element */
-.mapx-map .leaflet-tile { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.85); }   /* OSM-only tiles, dark-themed — no third-party tile server */
-.mapx-map .leaflet-control-attribution { background: rgba(12,16,24,0.7); color: rgba(244,246,251,0.6); }
+.mapx-map .leaflet-control-attribution { background: rgba(12,16,24,0.74); color: rgba(244,246,251,0.55); font-size: 9px; line-height: 1.7; padding: 0 5px; }
 .mapx-map .leaflet-control-attribution a { color: #9cc0ff; }
 .mapx-map .leaflet-bar a { background: rgba(22,27,36,0.92); color: #f4f6fb; border-bottom-color: rgba(255,255,255,0.14); }
 .mapx-map .leaflet-bar a:hover { background: rgba(40,46,58,0.95); }
@@ -63,7 +68,22 @@ async function geocode(q) {
 }
 const placeName = (r) => [r.name, r.admin1, r.country].filter(Boolean).join(", ");
 
-let api = null, styleEl = null, root = null, L = null, map = null, marker = null;
+/* tile styles. CARTO basemaps (OSM data, keyless) — they serve crisp @2x retina tiles ({r})
+   and proper light/dark designs, so no blurry upscaling and no CSS-invert hack. "OSM" is the
+   purest option (OpenStreetMap's own tiles, but not retina-sharp). */
+const CARTO = (s) => `https://{s}.basemaps.cartocdn.com/${s === "voyager" ? "rastertiles/voyager" : s}/{z}/{x}/{y}{r}.png`;
+const CARTO_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+const STYLES = {
+  dark:    { name: "Dark",  url: CARTO("dark_all"),  attr: CARTO_ATTR, sub: "abcd", max: 20 },
+  light:   { name: "Light", url: CARTO("light_all"), attr: CARTO_ATTR, sub: "abcd", max: 20 },
+  voyager: { name: "Voyager", url: CARTO("voyager"), attr: CARTO_ATTR, sub: "abcd", max: 20 },
+  osm:     { name: "OSM",   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", attr: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', sub: "abc", max: 19 },
+};
+const MKEY = "startpage:map";
+let SET = (() => { try { return Object.assign({ style: "dark" }, JSON.parse(localStorage.getItem(MKEY)) || {}); } catch { return { style: "dark" }; } })();
+function persist() { try { localStorage.setItem(MKEY, JSON.stringify(SET)); } catch {} }
+
+let api = null, styleEl = null, root = null, L = null, map = null, marker = null, tiles = null;
 let bodyEl = null, slotEl = null, mapEl = null, lbEl = null, keyHandler = null;
 let pending = null, debounceT = 0, gen = 0, current = null, results = [];
 
@@ -72,7 +92,14 @@ function fit() { if (api) api.setHeight(map ? 320 : 120); }
 function ensureMap() {
   if (map || !L || !mapEl) return;
   map = L.map(mapEl, { zoomControl: true, attributionControl: true, worldCopyJump: true }).setView([25, 10], 2);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(map);
+  map.attributionControl.setPrefix(false);     // drop the "Leaflet" prefix + flag — keep it to the tile/data credit
+  applyStyle();
+}
+function applyStyle() {
+  if (!map) return;
+  const s = STYLES[SET.style] || STYLES.dark;
+  if (tiles) map.removeLayer(tiles);
+  tiles = L.tileLayer(s.url, { maxZoom: s.max, subdomains: s.sub, attribution: s.attr }).addTo(map);   // {r} → @2x on retina = crisp
 }
 function setLocation(r, fly) {
   current = r;
@@ -90,7 +117,9 @@ function paintHead() {
   if (chips) chips.innerHTML = results.slice(0, 6).filter((r) => r !== current).map((r, i) => `<button type="button" class="mapx-chip" data-i="${results.indexOf(r)}">${esc(placeName(r))}</button>`).join("");
 }
 function buildScaffold() {
+  const styleSeg = Object.entries(STYLES).map(([id, s]) => `<button type="button" data-style="${id}" class="${SET.style === id ? "on" : ""}">${s.name}</button>`).join("");
   bodyEl.innerHTML = `<div class="mapx-head"><span class="mapx-name">${current ? "" : "Map"}</span><span class="mapx-spacer"></span>
+    <span class="mapx-seg">${styleSeg}</span>
     <a class="mapx-btn mapx-osm" target="_blank" rel="noopener" title="Open in OpenStreetMap" aria-label="Open in OpenStreetMap">${I_OSM}</a>
     <button type="button" class="mapx-btn mapx-expand" title="Full screen" aria-label="Full screen">${I_EXPAND}</button></div>
     <div class="mapx-chips"></div><div class="mapx-slot"><div class="mapx-map"></div></div>`;
@@ -137,6 +166,8 @@ function closeLb() {
 }
 
 function onClick(e) {
+  const st = e.target.closest("[data-style]");
+  if (st) { SET.style = st.getAttribute("data-style"); persist(); applyStyle(); bodyEl.querySelectorAll("[data-style]").forEach((b) => b.classList.toggle("on", b === st)); return; }
   if (e.target.closest(".mapx-expand")) { openLb(); return; }
   const chip = e.target.closest(".mapx-chip");
   if (chip) { const r = results[+chip.getAttribute("data-i")]; if (r) setLocation(r, true); return; }
@@ -146,8 +177,9 @@ const HELP = `
 <p>Search any place on an <strong>OpenStreetMap</strong> map — no Google, no API key. Type after <kbd>@@</kbd>
 and the top match is pinned, with other matches as chips you can click. <kbd>⤢</kbd> (or <kbd>↵</kbd>) opens a
 full-screen map; <kbd>esc</kbd> closes it.</p>
-<p>Geocoding uses the same keyless Open-Meteo service as the weather. The map uses OpenStreetMap's own tiles,
-dark-themed locally with a CSS filter — so nothing is fetched from a third-party tile or map provider.</p>`;
+<p>Geocoding uses the same keyless Open-Meteo service as the weather. Pick a tile style — <strong>Dark</strong>,
+<strong>Light</strong> or <strong>Voyager</strong> (crisp retina tiles from CARTO, built on OpenStreetMap data), or
+<strong>OSM</strong> for OpenStreetMap's own tiles. All keyless, no Google.</p>`;
 
 const plugin = {
   hints: [["type", "a place"], ["⤢", "full screen"], ["↵", "expand"]],
@@ -175,7 +207,7 @@ const plugin = {
     clearTimeout(debounceT);
     if (map) { map.remove(); map = null; }
     if (styleEl) styleEl.remove();
-    api = root = bodyEl = slotEl = mapEl = marker = current = null; results = []; pending = null; gen++;
+    api = root = bodyEl = slotEl = mapEl = marker = current = tiles = null; results = []; pending = null; gen++;
   },
 };
 export default plugin;

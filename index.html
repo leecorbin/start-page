@@ -83,6 +83,12 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .field:focus-within { background: var(--field-bg-focus); }   /* search is the default — no accent border; modes (below) colour it */
+  .omni-pick { flex: none; display: grid; place-items: center; width: 30px; height: 30px; margin-left: 4px; padding: 0; background: none; border: none; color: var(--fg); opacity: 0.4; cursor: pointer; border-radius: 8px; transition: opacity 0.15s ease, background 0.15s ease; }
+  .omni-pick:hover, .omni-pick.active { opacity: 0.95; background: rgba(255,255,255,0.12); }
+  .omni-pick svg { width: 17px; height: 17px; }
+  .omni-pick[hidden] { display: none; }
+  .field.mode-plugin .omni-pick, .field.mode-bang .omni-pick { display: none; }
+  body.lc-light .omni-pick { color: #15181f; }
   /* Light glass stays — on a light background the *content* flips dark (readable) instead of the glass. Plugins force dark (below). */
   body.lc-light .field:not(.mode-plugin) #q { color: #15181f; }
   body.lc-light .ic-search, body.lc-light .ic-globe { color: #15181f; }
@@ -103,7 +109,7 @@
   .bang-chip img { width: 16px; height: 16px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
   .bang-chip .ql-glyph { font-size: 15px; }
   .bang-chip .ql-mono { width: 16px; height: 16px; font-size: 9px; }
-  #q { flex: 1; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
+  #q { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
   .hints { max-width: 92vw; text-align: center; line-height: 1.7; font-size: 0.8rem; color: var(--muted); text-shadow: var(--halo); }
   .hk { white-space: nowrap; }
   .hk:not(:last-child)::after { content: "·"; margin: 0 0.25rem 0 0.6rem; opacity: 0.5; }
@@ -305,6 +311,9 @@
         <span id="bang-chip" class="bang-chip"></span>
         <span id="plugin-chip" class="bang-chip"></span>
         <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <button type="button" id="omni-pick" class="omni-pick" title="Pick a colour from the wallpaper" aria-label="Pick a colour from the wallpaper" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"></path><path d="M3 21v-3l9-9"></path><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path></svg>
+        </button>
         <div id="suggest" class="suggest" hidden></div>
       </div>
       <div id="plugin-panel"><div class="pp-card"><div class="pp-spin"></div><div class="pp-content"></div></div></div>
@@ -1011,7 +1020,7 @@ function showImage(url, author, link, instant) {
       bgEl.classList.add("loaded");
       setCredit(author, link);
     }
-    lastImg = img; analyzeContrast(img);
+    lastImg = img; analyzeContrast(img); updateOmniPick();
   };
   img.src = url;
 }
@@ -1104,7 +1113,7 @@ async function refreshBackground(force) {
     document.body.style.background = b.solid;
     const sl = solidLuminance(b.solid) > 150;   // a light solid → adapt to dark glass too
     ["lc-light", "bl-light", "br-light"].forEach((c) => document.body.classList.toggle(c, sl));
-    $("controls").classList.add("no-image"); CURRENT = null;
+    $("controls").classList.add("no-image"); CURRENT = null; updateOmniPick();
     return;
   }
   document.body.style.background = "";
@@ -1213,9 +1222,15 @@ $("tp-reset").onclick = resetTune;
 $("tp-close").onclick = closeTune;
 
 /* Eyedropper — sample a colour straight out of the current photo for the tint (no native EyeDropper in Safari). */
-let picking = false;
-function startPick() { if (lastImg && tuneTarget) { picking = true; document.body.classList.add("eyedropping"); $("tp-pick").classList.add("active"); } }
-function endPick() { picking = false; document.body.classList.remove("eyedropping"); const p = $("tp-pick"); if (p) p.classList.remove("active"); }
+let picking = false, pickCb = null, pickBtn = null;
+function beginPick(onPick, btn) {                                  // generic: sample a colour from the wallpaper
+  if (!lastImg) return false;
+  picking = true; pickCb = onPick || null; pickBtn = btn || null;
+  document.body.classList.add("eyedropping");
+  if (pickBtn) pickBtn.classList.add("active");
+  return true;
+}
+function endPick() { picking = false; pickCb = null; document.body.classList.remove("eyedropping"); if (pickBtn) pickBtn.classList.remove("active"); pickBtn = null; }
 function samplePixel(cx, cy) {
   const iw = lastImg.naturalWidth, ih = lastImg.naturalHeight, vw = innerWidth, vh = innerHeight;
   const scale = Math.max(vw / iw, vh / ih);                        // background-size: cover, centred
@@ -1227,18 +1242,40 @@ function samplePixel(cx, cy) {
   const d = ctx.getImageData(0, 0, 1, 1).data;
   return "#" + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, "0")).join("");
 }
-$("tp-pick").onclick = (e) => { e.stopPropagation(); picking ? endPick() : startPick(); };
-document.addEventListener("click", (e) => {
-  if (!picking || $("tune-pop").contains(e.target)) return;       // let the popover's own controls work while picking
-  e.preventDefault(); e.stopPropagation();                        // sampling click shouldn't navigate or close the panel
-  try {
-    $("tp-tint").value = samplePixel(e.clientX, e.clientY);
+$("tp-pick").onclick = (e) => {                                    // tune popover → pick a tint
+  e.stopPropagation();
+  if (picking) { endPick(); return; }
+  if (!tuneTarget) return;
+  beginPick((hex) => {
+    $("tp-tint").value = hex;
     if (+$("tp-tintStrength").value === 0) $("tp-tintStrength").value = 30;   // make the pick actually show
     tuneChanged();
-  } catch {}
-  endPick();
+  }, $("tp-pick"));
+};
+document.addEventListener("click", (e) => {
+  if (!picking) return;
+  if (($("tune-pop") && $("tune-pop").contains(e.target)) || $("omni-pick").contains(e.target)) return;   // let UI controls work while picking
+  e.preventDefault(); e.stopPropagation();                        // sampling click shouldn't navigate or close anything
+  let hex = null; try { hex = samplePixel(e.clientX, e.clientY); } catch {}
+  const cb = pickCb; endPick();
+  if (hex && cb) cb(hex);
 }, true);
 document.addEventListener("keydown", (e) => { if (picking && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endPick(); } }, true);
+
+/* omnibox eyedropper → grab a colour from the wallpaper straight into the Colour lab */
+function updateOmniPick() {
+  const btn = $("omni-pick"); if (!btn) return;
+  btn.hidden = (S.disabledPlugins || []).includes("color") || !lastImg || S.bg.provider === "solid";
+}
+$("omni-pick").onclick = (e) => {
+  e.preventDefault(); e.stopPropagation();
+  if (picking) { endPick(); return; }
+  beginPick((hex) => {
+    if ((S.disabledPlugins || []).includes("color") || activePlugin) return;
+    const def = PLUGINS.find((p) => p.id === "color");
+    if (def) openPlugin(def, hex.replace(/^#/, ""));
+  }, $("omni-pick"));
+};
 
 /* New-images slider — readout + unlock state. */
 const NEWIMG_NAMES = { 0: "Never", 2: "Rarely", 4: "Sometimes", 6: "Often", 8: "Always" };
@@ -1489,7 +1526,7 @@ function renderPluginToggles() {
         S.disabledPlugins.push(def.id);
         if (activePlugin && activePlugin.def.id === def.id) closePlugin();
       }
-      save();
+      save(); updateOmniPick();
     };
     row.append(label, cb);
     wrap.appendChild(row);

@@ -48,7 +48,11 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     always reappears looking just-so. An **eyedropper** lets you pull a tint colour
     straight out of the photo. New and un-tuned images use an adjustable
     **default look**.
-  - **Local folder** — drop your own wallpapers in `backgrounds/`
+  - **Local folder** — drop your own wallpapers in `backgrounds/`. This source
+    only appears when a `backgrounds/` folder is actually present (you're on
+    `file://`, you've already configured it, or the folder announces itself with
+    a `backgrounds/manifest.json` listing the images — which also auto-fills the
+    file list), so a typical hosted copy stays uncluttered.
   - **Solid colour**
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
@@ -76,7 +80,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always
-  returns to the normal omnibox. `⌘/` inside a plugin opens **its own help page**,
+  returns to the normal omnibox — or **click the plugin chip** (it shows a `×`)
+  to leave without the keyboard; if the plugins row is shown, its launcher lights
+  up and a second click closes it. `⌘/` inside a plugin opens **its own help page**,
   and each plugin can be toggled on/off in Settings → Shortcuts. Plugins live in
   `plugins/*.js` and are only downloaded on first use, so the core page stays
   instant. **Plugins load via dynamic `import()`, which browsers block from
@@ -114,10 +120,17 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     click-to-copy. The clear `×` resets it for the next snippet.
   - 📖 **Dictionary** (`??`) — type a word for **definitions** + IPA + a **▶ play**
     pronunciation, a **thesaurus** (synonyms / antonyms / related), and a
-    **Wikipedia** excerpt — all keyless (dictionaryapi.dev, Datamuse, Wikipedia
-    REST). **Click any word to look it up** and `←` to retrace, like the colour lab.
-    A ⚙ toggles **Urban Dictionary** slang (off by default). The one plugin that
-    uses the network — debounced and cached.
+    **Wikipedia** excerpt with image — all keyless (dictionaryapi.dev, Datamuse,
+    Wikipedia REST). **Click any word to look it up** and `←` to retrace, like the
+    colour lab; **click the Wikipedia image** to enlarge it in the box. A ⚙ panel
+    toggles **Wikipedia** (on) and **Urban Dictionary** slang (off by default).
+    Debounced and cached.
+  - 🖼️ **Images** (`::`) — keyless **image search** over freely-licensed sources:
+    **Openverse** (Creative-Commons, aggregated from Flickr, museums and more) or
+    **Wikimedia Commons**. Results come back as a thumbnail grid; click one to
+    open a **lightbox** — the image large with **creator + licence attribution**
+    and a link to the source. `←`/`→` browse the set, `esc` closes the viewer.
+    Mature content is filtered; please honour each licence and credit the creator.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

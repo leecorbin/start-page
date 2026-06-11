@@ -29,8 +29,11 @@ const CSS = `
 .imgx-lb-cap .m { color: rgba(244,246,251,0.62); font-size: 0.82rem; margin-top: 0.15rem; }
 .imgx-lb-cap a { color: #9cc0ff; text-decoration: none; }
 .imgx-lb-cap a:hover { text-decoration: underline; }
-.imgx-lb-close { position: fixed; top: 16px; right: 20px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.22); background: rgba(20,24,32,0.7); color: #fff; font-size: 1.4rem; line-height: 1; cursor: pointer; display: grid; place-items: center; }
-.imgx-lb-close:hover { background: rgba(40,46,58,0.9); }
+.imgx-lb-close, .imgx-lb-dl { position: fixed; top: 16px; z-index: 2; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.22); background: rgba(20,24,32,0.7); color: #fff; cursor: pointer; display: grid; place-items: center; }
+.imgx-lb-close { right: 20px; font-size: 1.4rem; line-height: 1; }
+.imgx-lb-dl { right: 70px; }
+.imgx-lb-dl svg { width: 18px; height: 18px; }
+.imgx-lb-close:hover, .imgx-lb-dl:hover { background: rgba(40,46,58,0.9); }
 .imgx-lb-nav { position: fixed; top: 50%; transform: translateY(-50%); z-index: 2; width: 46px; height: 64px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.16); background: rgba(20,24,32,0.55); color: #fff; font-size: 1.8rem; line-height: 1; cursor: pointer; display: grid; place-items: center; }
 .imgx-lb-nav:hover { background: rgba(40,46,58,0.85); }
 .imgx-lb-nav.prev { left: 14px; } .imgx-lb-nav.next { right: 14px; }
@@ -128,9 +131,11 @@ function capHtml(r) {
 function paintLb() {
   const r = results[lbIndex]; if (!r || !lbEl) return;
   const multi = results.length > 1;
+  const DL = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
   lbEl.innerHTML = `<div class="imgx-lb-backdrop" data-act="close"></div>
     <button type="button" class="imgx-lb-nav prev" data-act="prev" aria-label="Previous"${multi ? "" : " hidden"}>‹</button>
     <button type="button" class="imgx-lb-nav next" data-act="next" aria-label="Next"${multi ? "" : " hidden"}>›</button>
+    <button type="button" class="imgx-lb-dl" data-act="download" title="Download" aria-label="Download">${DL}</button>
     <button type="button" class="imgx-lb-close" data-act="close" aria-label="Close">×</button>
     <figure class="imgx-lb-fig"><img src="${esc(r.full)}" alt="${esc(r.title)}" /><figcaption class="imgx-lb-cap">${capHtml(r)}</figcaption></figure>`;
 }
@@ -142,6 +147,7 @@ function openLb(i) {
       const a = e.target.closest("[data-act]"); if (!a) return;
       const act = a.getAttribute("data-act");
       if (act === "close") closeLb(); else if (act === "next") navLb(1); else if (act === "prev") navLb(-1);
+      else if (act === "download") downloadImg(results[lbIndex]);
     });
     document.body.appendChild(lbEl);
     keyHandler = (e) => {                                  // capture phase so esc/arrows act on the lightbox, not the omnibox/core
@@ -154,6 +160,18 @@ function openLb(i) {
   paintLb();
 }
 function navLb(d) { if (!results.length) return; lbIndex = (lbIndex + d + results.length) % results.length; paintLb(); }
+async function downloadImg(r) {                                  // same fetch→blob→<a download> the core uses, with a new-tab fallback
+  if (!r || !r.full) return;
+  const ext = (r.full.match(/\.(jpe?g|png|webp|gif|avif)(?:[?#]|$)/i) || [, "jpg"])[1].toLowerCase();
+  const name = ((r.title || "image").replace(/[^\w-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "image") + "." + (ext === "jpeg" ? "jpg" : ext);
+  try {
+    const resp = await fetch(r.full, { mode: "cors" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(await resp.blob()); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  } catch { window.open(r.full, "_blank"); }
+}
 function closeLb() {
   if (keyHandler) { document.removeEventListener("keydown", keyHandler, true); keyHandler = null; }
   if (lbEl) { lbEl.remove(); lbEl = null; }

@@ -26,6 +26,21 @@ const CSS = `
 .col-hbtn { font: inherit; font-size: 0.74rem; line-height: 1; padding: 0.36rem 0.62rem; border: none; border-radius: 8px; cursor: pointer; }
 .col-hbtn:disabled { opacity: 0.35; cursor: default; }
 .col-hint { text-transform: none; letter-spacing: 0; opacity: 0.7; }
+.col-cssname { opacity: 0.7; font-weight: 400; }
+.col-star { font-size: 0.95rem; line-height: 1; padding: 0.3rem 0.5rem; }
+.col-saveform { display: flex; gap: 0.4rem; }
+.col-savename { flex: 1; min-width: 0; background: rgba(255,255,255,0.06); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.4rem 0.6rem; color: var(--fg, #f4f6fb); font: inherit; font-size: 0.9rem; outline: none; }
+.col-savename:focus { border-color: var(--accent, #5b9bff); }
+.col-svdgo { flex: none; background: var(--accent, #5b9bff); border: none; border-radius: 9px; color: #fff; font: inherit; font-size: 0.85rem; padding: 0 0.9rem; cursor: pointer; }
+.col-svdgo:hover { filter: brightness(1.08); }
+.col-saved { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.col-svditem { position: relative; display: flex; flex-direction: column; align-items: center; gap: 0.18rem; width: 52px; }
+.col-svdsw { width: 100%; height: 34px; border-radius: 8px; border: none; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.14); padding: 0; }
+.col-svdsw:hover { outline: 2px solid rgba(255,255,255,0.6); outline-offset: -2px; }
+.col-svdname { font-size: 0.64rem; color: var(--muted, rgba(244,246,251,0.6)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-svddel { position: absolute; top: -5px; right: -3px; width: 15px; height: 15px; padding: 0; border: none; border-radius: 50%; background: rgba(12,16,24,0.95); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: none; place-items: center; }
+.col-svditem:hover .col-svddel { display: grid; }
+.col-svddel:hover { background: #d9534f; }
 .col-formats { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.4rem; }
 .col-formats button { flex: 1 1 28%; min-width: 0; display: flex; flex-direction: column; gap: 0.06rem; align-items: flex-start; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.3rem 0.55rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
 .col-formats button:hover { background: rgba(255,255,255,0.12); }
@@ -266,15 +281,38 @@ function pickedCol(hex) {                                          // a little c
   const chip = (col, lab, on) => `<button type="button" class="col-pchip${on ? " on" : ""}" data-set="${col}" title="${lab} — ${col} · click to use" style="background:${col}"></button>`;
   return `<div class="col-picked">${chip(picked.shown, "Shown (adjusted)", hex === picked.shown)}${chip(picked.raw, "Original photo pixel", hex === picked.raw)}</div>`;
 }
+/* ---- saved (named) colours — a personal brand palette ---- */
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const SKEY = "startpage:colors";
+let SAVED = (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || []; } catch { return []; } })();
+let saving = false;
+function persistSaved() { try { localStorage.setItem(SKEY, JSON.stringify(SAVED)); } catch {} }
+function savedNameFor(hex) { const e = SAVED.find((s) => s.hex.toLowerCase() === hex.toLowerCase()); return e ? e.name : null; }
+function savedByName(name) { const e = SAVED.find((s) => s.name.toLowerCase() === name.toLowerCase()); return e ? e.hex : null; }
+function saveColour(name, hex) {
+  name = (name || "").trim().slice(0, 40); if (!name) return;
+  const i = SAVED.findIndex((s) => s.name.toLowerCase() === name.toLowerCase());
+  if (i >= 0) SAVED[i].hex = hex; else SAVED.push({ name, hex });
+  persistSaved();
+}
+function deleteSaved(name) { SAVED = SAVED.filter((s) => s.name.toLowerCase() !== (name || "").toLowerCase()); persistSaved(); }
+function savedSection() {
+  if (!SAVED.length) return "";
+  return `<div class="col-sec"><div class="col-h">Saved <span class="col-hint">· click to load</span></div><div class="col-saved">` +
+    SAVED.map((s) => `<span class="col-svditem"><button type="button" class="col-svdsw" data-set="${s.hex}" title="${esc(s.name)} — ${s.hex}" style="background:${s.hex}"></button><span class="col-svdname" title="${esc(s.name)}">${esc(s.name)}</span><button type="button" class="col-svddel" data-del="${esc(s.name)}" title="Forget ${esc(s.name)}">×</button></span>`).join("") + `</div></div>`;
+}
+
 function buildInner(c, second) {
   const hex = toHex(c);
   const textC = contrast(c, { r: 0, g: 0, b: 0 }) >= contrast(c, { r: 255, g: 255, b: 255 }) ? "#000" : "#fff";
   const btnBg = textC === "#000" ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.22)";
-  const nm = nearestName(c), nameLabel = nm.exact ? nm.name : "≈ " + nm.name;
+  const nm = nearestName(c), nameLabel = nm.exact ? nm.name : "≈ " + nm.name, savedName = savedNameFor(hex);
+  const nameHtml = savedName ? `${esc(savedName)} <span class="col-cssname">· ${nameLabel}</span>` : nameLabel;
   const cw = contrast(c, { r: 255, g: 255, b: 255 }), ck = contrast(c, { r: 0, g: 0, b: 0 });
   const best = ck >= cw ? { t: "black", r: ck } : { t: "white", r: cw };
   let html = "";
-  html += `<div class="col-herorow"><div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div><div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>${pickedCol(hex)}</div>`;
+  html += `<div class="col-herorow"><div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameHtml}</div></div><div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn col-star${savedName ? " on" : ""}" data-act="save" style="background:${btnBg};color:${textC}" title="${savedName ? "Saved — rename or update" : "Save this colour"}" aria-label="Save">${savedName ? "★" : "☆"}</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>${pickedCol(hex)}</div>`;
+  if (saving) html += `<div class="col-saveform"><input type="text" class="col-savename" placeholder="Name this colour…" value="${esc(savedName || "")}" maxlength="40" autocomplete="off" spellcheck="false" /><button type="button" class="col-svdgo" data-act="savego">Save</button></div>`;
   html += `<div class="col-formats">${fmtChip("RGB", rgbVals(c), fmtRgb(c))}${fmtChip("HSL", hslVals(c), fmtHsl(c))}${fmtChip("OKLCH", oklchVals(c), fmtOklch(c), "OKLCH — a modern, perceptually even colour space: lightness · chroma · hue (CSS Color 4). Click copies the CSS value.")}</div>`;
   html += `<div class="col-sec"><div class="col-h">Contrast</div><div class="col-contrast"><div class="col-ct" style="background:${hex};color:#fff"><b>Aa</b><span>${cw.toFixed(2)} · ${badge(cw)}</span></div><div class="col-ct" style="background:${hex};color:#000"><b>Aa</b><span>${ck.toFixed(2)} · ${badge(ck)}</span></div></div><div class="col-best">Best text: ${best.t} — ${best.r.toFixed(2)}:1 (${badge(best.r)})</div></div>`;
   html += `<div class="col-sec"><div class="col-h">Harmonies <span class="col-hint">· click to explore</span></div>` +
@@ -286,6 +324,7 @@ function buildInner(c, second) {
   }
   html += `<div class="col-sec"><div class="col-h">Colour vision</div><div class="col-cvd">` +
     Object.entries(CVD).map(([k, m]) => `<div>${swatch(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
+  html += savedSection();
   return html;
 }
 
@@ -299,6 +338,9 @@ shade, then <strong>Copy</strong>. <kbd>←</kbd> steps back through where you'v
 <p>The two buttons at the top-right of the box are a <strong>visual picker</strong> (a
 saturation/value square + hue strip — drag to redefine the colour by eye) and, when you have a
 photo wallpaper, a <strong>wallpaper eyedropper</strong>.</p>
+<p><strong>Save</strong> a colour with <kbd>☆</kbd> and give it a name (e.g. <em>coral</em>, <em>brand blue</em>)
+— it joins your <strong>Saved</strong> palette at the bottom. Type a saved name any time to pull it
+straight back up (your names beat the CSS ones), or click its swatch.</p>
 <h3>What you get</h3>
 <table class="help-keys">
   <tr><td><kbd>formats</kbd></td><td>RGB · HSL · OKLCH — click a value to copy its CSS</td></tr>
@@ -332,7 +374,7 @@ function toast(msg) {
   clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 1100);
 }
 function render() {
-  innerEl.innerHTML = base ? buildInner(base, second) : PH_HTML;
+  innerEl.innerHTML = base ? buildInner(base, second) : (PH_HTML + savedSection());
   if (scrollEl) scrollEl.scrollTop = 0;
   if (pickEl && !pickEl.hidden && !dragging) syncPicker();   // keep the picker in step when the colour changes elsewhere
   fit();
@@ -347,9 +389,22 @@ function setBase(rgb, pushHist) {
   if (pushHist && base) history.push(base);
   applyBase(rgb);
 }
+function doSave() {
+  const inp = innerEl.querySelector(".col-savename");
+  if (inp && base && inp.value.trim()) { saveColour(inp.value, toHex(base)); toast("Saved " + inp.value.trim()); }
+  saving = false; render();
+}
 function onClick(e) {
+  const delEl = e.target.closest("[data-del]");
+  if (delEl) { deleteSaved(delEl.getAttribute("data-del")); render(); return; }
+  if (e.target.closest('[data-act="save"]')) {                                         // open/close the name field
+    saving = !saving; render();
+    if (saving) { const inp = innerEl.querySelector(".col-savename"); if (inp) { inp.focus(); inp.select(); } }
+    return;
+  }
+  if (e.target.closest('[data-act="savego"]')) { doSave(); return; }
   const setEl = e.target.closest("[data-set]");
-  if (setEl) { setBase(parseColor(setEl.getAttribute("data-set")), true); return; }   // explore: becomes the main colour
+  if (setEl) { saving = false; setBase(parseColor(setEl.getAttribute("data-set")), true); return; }   // explore / load saved
   if (e.target.closest('[data-act="back"]')) { if (history.length) applyBase(history.pop()); return; }
   const copyEl = e.target.closest("[data-copy]");
   if (copyEl) { const v = copyEl.getAttribute("data-copy"); try { navigator.clipboard.writeText(v); } catch {} toast("Copied " + v); }
@@ -412,9 +467,14 @@ const plugin = {
     pickEl = root.querySelector(".col-pickbox");
     svEl = root.querySelector(".col-sv"); svhEl = root.querySelector(".col-svh");
     hueEl = root.querySelector(".col-hue"); huehEl = root.querySelector(".col-hueh");
-    base = null; second = null; history = []; dragging = false;
-    innerEl.innerHTML = PH_HTML;
+    base = null; second = null; history = []; dragging = false; saving = false;
+    innerEl.innerHTML = PH_HTML + savedSection();
     root.addEventListener("click", onClick);
+    root.addEventListener("keydown", (e) => {                  // the name field: Enter saves, Esc cancels (without closing the plugin)
+      if (!e.target.classList || !e.target.classList.contains("col-savename")) return;
+      if (e.key === "Enter") { e.preventDefault(); doSave(); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); saving = false; render(); }
+    });
     svEl.addEventListener("pointerdown", (e) => dragStart(svEl, svFromPointer, e));
     svEl.addEventListener("pointermove", (e) => { if (dragging) svFromPointer(e); });
     hueEl.addEventListener("pointerdown", (e) => dragStart(hueEl, hueFromPointer, e));
@@ -433,8 +493,10 @@ const plugin = {
   },
   onInput(text) {
     const t = (text || "").trim();
-    picked = null;   // typing chooses a fresh colour; drop the eyedrop pair
+    picked = null; saving = false;   // typing chooses a fresh colour
     if (!t) { base = null; second = null; history = []; render(); return; }
+    const savedHex = savedByName(t);
+    if (savedHex) { base = parseColor(savedHex); second = null; history = []; render(); return; }   // a saved name wins over CSS names
     const colors = findColors(t);
     if (!colors.length) { if (!base) render(); return; }   // keep last good while mid-type
     base = colors[0]; second = colors[1] || null; history = [];   // typing is a fresh starting point
@@ -447,7 +509,7 @@ const plugin = {
     if (styleEl) styleEl.remove();
     clearTimeout(toastT); if (rafId) cancelAnimationFrame(rafId); rafId = 0;
     api = scrollEl = bodyEl = innerEl = toastEl = styleEl = pickEl = svEl = svhEl = hueEl = huehEl = paletteBtn = null;
-    base = null; second = null; history = []; dragging = false; picked = null;
+    base = null; second = null; history = []; dragging = false; picked = null; saving = false;
   },
 };
 export default plugin;

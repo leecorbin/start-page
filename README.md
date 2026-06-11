@@ -100,7 +100,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     ramp, and a **colour-blindness** preview. **Click any swatch to make it the main
     colour** and travel the palettes; a back arrow retraces your steps, and a Copy
     button grabs the one you settled on. Two colours (`#5b9bff #ff5b9b`) draw a
-    **gradient** with copyable CSS. All offline maths.
+    **gradient** with copyable CSS. **Save** colours with a name (☆) to build a
+    personal **brand palette** — type a saved name (e.g. `coral`) or click its
+    swatch to pull it straight back up. All offline maths.
   - 🛠️ **Dev tools** (`;;`) — keyless developer utilities that route from what you
     type: number **bases + bitwise** (`0xF0 & 0x0F`, `1 << 8`) with an interactive
     **bit grid** you click to toggle, **UUID v4** (`uuid 5`), **Unix timestamps**

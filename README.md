@@ -126,15 +126,13 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     **gradient** with copyable CSS. **Save** colours with a name (☆) to build a
     personal **brand palette** — type a saved name (e.g. `coral`) or click its
     swatch to pull it straight back up. All offline maths.
-  - 🛠️ **Dev tools** (`;;`) — keyless developer utilities that route from what you
-    type: number **bases + bitwise** (`0xF0 & 0x0F`, `1 << 8`) with an interactive
-    **bit grid** you click to toggle, **UUID v4** (`uuid 5`), **Unix timestamps**
-    (`ts 1718000000`, `now`), **Base64** and **URL** encode/decode (`b64 …`, `url …`),
-    and **SHA-1/256** hashes — all click-to-copy.
-  - 🔤 **Text** (`,,`) — paste or type text and get every **case** (UPPER, lower,
-    Title, Sentence, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE),
-    a **slug**, reverse, trimmed, and **counts** (chars/words/lines/bytes) — each
-    click-to-copy. The clear `×` resets it for the next snippet.
+  - 🛠️ **Tools** (`<>`) — keyless, offline utilities that route from what you type.
+    **Developer:** number **bases + bitwise** (`0xF0 & 0x0F`, `1 << 8`) with an
+    interactive **bit grid**, **UUID v4** (`uuid 5`), **Unix timestamps**
+    (`ts 1718000000`, `now`), **Base64**/**URL** encode-decode, **SHA-1/256** hashes.
+    **Text:** anything else you type gets every **case** (UPPER, lower, Title,
+    Sentence, camel, Pascal, snake, kebab, CONSTANT), a **slug**, reverse, trim, and
+    **counts** (chars/words/lines/bytes). All click-to-copy.
   - 📖 **Dictionary** (`??`) — type a word for **definitions** + IPA + a **▶ play**
     pronunciation, a **thesaurus** (synonyms / antonyms / related), and a
     **Wikipedia** excerpt with image — all keyless (dictionaryapi.dev, Datamuse,
@@ -142,7 +140,7 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     colour lab; **click the Wikipedia image** to enlarge it in the box. A ⚙ panel
     toggles **Wikipedia** (on) and **Urban Dictionary** slang (off by default).
     Debounced and cached.
-  - 🖼️ **Images** (`::`) — keyless **image search** over freely-licensed sources:
+  - 🖼️ **Images** (`[]`) — keyless **image search** over freely-licensed sources:
     **Openverse** (Creative-Commons, aggregated from Flickr, museums and more) or
     **Wikimedia Commons**. Results come back as a thumbnail grid; click one to
     open a **lightbox** — the image large with **creator + licence attribution**
@@ -153,9 +151,9 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     Google, no API key). Type a place to geocode it (Open-Meteo, the same service
     the weather uses), pin it, and pick between matches; a deep link opens it on
     openstreetmap.org. **Expand** (or `↵`) to a full-screen map, `esc` to close.
-    OSM's own tiles, dark-themed locally with a CSS filter — nothing is fetched
-    from a third-party tile provider. Uses a lazy-loaded, **self-hosted** copy of
-    Leaflet (`plugins/vendor/`).
+    Pick a **tile style** — Dark / Light / Voyager (crisp retina tiles from CARTO,
+    built on OSM data) or OSM (OpenStreetMap's own tiles) — all keyless, no Google.
+    Uses a lazy-loaded, **self-hosted** copy of Leaflet (`plugins/vendor/`).
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
@@ -198,8 +196,9 @@ bar, with full history/autocomplete.)
 - Local-folder mode is fully offline.
 - Plugins use only **keyless** providers too: dictionaryapi.dev, Datamuse and
   Wikipedia (dictionary); Openverse and Wikimedia Commons (images); Open-Meteo
-  geocoding and OpenStreetMap tiles (map); BigDataCloud reverse geocoding (to name
-  your location for the weather). No API keys, no proxy backends.
+  geocoding and OpenStreetMap / CARTO tiles (map — CARTO basemaps are OSM-data and
+  keyless); BigDataCloud reverse geocoding (to name your location for the weather).
+  No API keys, no proxy backends, no Google.
 - [Leaflet](https://leafletjs.com) (BSD-2-Clause) is **vendored** under
   `plugins/vendor/` and served from your own origin — never a CDN at runtime.
 - Ships with `<meta name="robots" content="noindex, nofollow">` so a hosted copy

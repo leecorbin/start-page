@@ -6,6 +6,12 @@
 const CSS = `
 .colp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
 .colp-inner { padding: 0.55rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.65rem; }
+.col-pickbox { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.6rem 0.8rem 0.15rem; }
+.col-pickbox[hidden] { display: none; }
+.col-sv { position: relative; height: 116px; border-radius: 9px; cursor: crosshair; touch-action: none; background-color: var(--hue, #f00); background-image: linear-gradient(to right, #fff, rgba(255,255,255,0)), linear-gradient(to top, #000, rgba(0,0,0,0)); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+.col-svh { position: absolute; width: 14px; height: 14px; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px rgba(0,0,0,0.45); pointer-events: none; }
+.col-hue { position: relative; height: 14px; border-radius: 7px; cursor: ew-resize; touch-action: none; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); }
+.col-hueh { position: absolute; top: 50%; width: 8px; height: 18px; border: 2px solid #fff; border-radius: 4px; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px rgba(0,0,0,0.45); pointer-events: none; }
 .col-ph { padding: 0.7rem 0.3rem; color: rgba(244,246,251,0.42); font-size: 0.85rem; line-height: 1.7; }
 .col-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
 .col-hero { border-radius: 12px; padding: 0.78rem 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
@@ -109,6 +115,21 @@ function hslToRgb(h, s, l) {
   return { r: Math.round(hue(h + 1 / 3) * 255), g: Math.round(hue(h) * 255), b: Math.round(hue(h - 1 / 3) * 255) };
 }
 
+function rgbToHsv({ r, g, b }) {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0; const s = mx === 0 ? 0 : d / mx, v = mx;
+  if (d) { h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+  return { h, s, v };
+}
+function hsvToRgb(h, s, v) {
+  h = (((h % 360) + 360) % 360) / 60;
+  const c = v * s, x = c * (1 - Math.abs(h % 2 - 1)), m = v - c;
+  let r = 0, g = 0, b = 0;
+  if (h < 1) { r = c; g = x; } else if (h < 2) { r = x; g = c; } else if (h < 3) { g = c; b = x; }
+  else if (h < 4) { g = x; b = c; } else if (h < 5) { r = x; b = c; } else { r = c; b = x; }
+  return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+}
 const srgbToLin = (c) => { c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
 const linToByte = (c) => clampByte((c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055) * 255);
 function rgbToOklab({ r, g, b }) {
@@ -265,6 +286,9 @@ const HELP = `
 <p><strong>Click any swatch</strong> (harmony or tint) to make it the main colour — everything
 recalculates around it, so you can travel complementary → analogous → … to the perfect
 shade, then <strong>Copy</strong>. <kbd>←</kbd> steps back through where you've been.</p>
+<p>The two buttons at the top-right of the box are a <strong>visual picker</strong> (a
+saturation/value square + hue strip — drag to redefine the colour by eye) and, when you have a
+photo wallpaper, a <strong>wallpaper eyedropper</strong>.</p>
 <h3>What you get</h3>
 <table class="help-keys">
   <tr><td><kbd>formats</kbd></td><td>RGB · HSL · OKLCH — click a value to copy its CSS</td></tr>
@@ -284,11 +308,13 @@ steps look equally different, which is why it's great for palettes and gradients
   <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
 </table>`;
 
-let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0;
+let api = null, scrollEl = null, bodyEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0;
 let base = null, second = null, history = [];
+let pickEl = null, svEl = null, svhEl = null, hueEl = null, huehEl = null;          // visual picker
+let pickerHsv = { h: 0, s: 0, v: 0 }, dragging = false, rafId = 0, rafRgb = null;
 
 const MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));
-function fit() { if (innerEl) api.setHeight(Math.min(innerEl.offsetHeight, MAXH())); }
+function fit() { if (bodyEl) api.setHeight(Math.min(bodyEl.offsetHeight, MAXH())); }
 function toast(msg) {
   if (!toastEl) return;
   toastEl.textContent = msg; toastEl.classList.add("show");
@@ -297,24 +323,67 @@ function toast(msg) {
 function render() {
   innerEl.innerHTML = base ? buildInner(base, second) : PH_HTML;
   if (scrollEl) scrollEl.scrollTop = 0;
+  if (pickEl && !pickEl.hidden && !dragging) syncPicker();   // keep the picker in step when the colour changes elsewhere
   fit();
 }
-function setBase(rgb, pushHist) {
-  if (!rgb) return;
-  if (pushHist && base) history.push(base);
+function applyBase(rgb) {                     // set the main colour without touching history
   base = rgb; second = null;
   if (api) api.setInput(toHex(rgb).slice(1));   // keep the omnibox in sync (the ## chip owns the hash)
   render();
 }
+function setBase(rgb, pushHist) {
+  if (!rgb) return;
+  if (pushHist && base) history.push(base);
+  applyBase(rgb);
+}
 function onClick(e) {
   const setEl = e.target.closest("[data-set]");
   if (setEl) { setBase(parseColor(setEl.getAttribute("data-set")), true); return; }   // explore: becomes the main colour
-  if (e.target.closest('[data-act="back"]')) {
-    if (history.length) { base = history.pop(); second = null; if (api) api.setInput(toHex(base).slice(1)); render(); }
-    return;
-  }
+  if (e.target.closest('[data-act="back"]')) { if (history.length) applyBase(history.pop()); return; }
   const copyEl = e.target.closest("[data-copy]");
   if (copyEl) { const v = copyEl.getAttribute("data-copy"); try { navigator.clipboard.writeText(v); } catch {} toast("Copied " + v); }
+}
+
+/* ---- visual picker: saturation/value square + hue strip, redefines the main colour live ---- */
+const PICKER_HTML = `<div class="col-sv"><div class="col-svh"></div></div><div class="col-hue"><div class="col-hueh"></div></div>`;
+function positionHandles() {
+  svEl.style.setProperty("--hue", `hsl(${pickerHsv.h}, 100%, 50%)`);
+  svhEl.style.left = (pickerHsv.s * 100) + "%";
+  svhEl.style.top = ((1 - pickerHsv.v) * 100) + "%";
+  huehEl.style.left = (pickerHsv.h / 360 * 100) + "%";
+}
+function syncPicker() { if (base) { pickerHsv = rgbToHsv(base); positionHandles(); } }
+function applyBaseRaf(rgb) {                  // throttle live updates to one per frame for smooth dragging
+  rafRgb = rgb;
+  if (rafId) return;
+  rafId = requestAnimationFrame(() => { rafId = 0; applyBase(rafRgb); });
+}
+function svFromPointer(e) {
+  const r = svEl.getBoundingClientRect();
+  pickerHsv.s = clamp01((e.clientX - r.left) / r.width);
+  pickerHsv.v = clamp01(1 - (e.clientY - r.top) / r.height);
+  positionHandles();
+  applyBaseRaf(hsvToRgb(pickerHsv.h, pickerHsv.s, pickerHsv.v));
+}
+function hueFromPointer(e) {
+  const r = hueEl.getBoundingClientRect();
+  pickerHsv.h = clamp01((e.clientX - r.left) / r.width) * 360;
+  positionHandles();
+  applyBaseRaf(hsvToRgb(pickerHsv.h, pickerHsv.s, pickerHsv.v));
+}
+function dragStart(el, move, e) {
+  e.preventDefault();
+  if (base) history.push(base);              // one history entry per drag session
+  dragging = true; try { el.setPointerCapture(e.pointerId); } catch {}
+  move(e);
+}
+function togglePicker() {
+  if (!pickEl) return;
+  if (pickEl.hidden) {
+    if (!base) applyBase({ r: 91, g: 155, b: 255 });   // a pleasant seed from blank
+    pickEl.hidden = false; syncPicker();
+  } else pickEl.hidden = true;
+  fit();
 }
 
 const plugin = {
@@ -323,19 +392,29 @@ const plugin = {
   mount(root, hostApi) {
     api = hostApi;
     styleEl = document.createElement("style"); styleEl.textContent = CSS; document.head.appendChild(styleEl);
-    root.innerHTML = `<div class="colp"><div class="colp-inner"></div></div><div class="col-toast"></div>`;
+    root.innerHTML = `<div class="colp"><div class="colp-body"><div class="col-pickbox" hidden>${PICKER_HTML}</div><div class="colp-inner"></div></div></div><div class="col-toast"></div>`;
     scrollEl = root.querySelector(".colp");
+    bodyEl = root.querySelector(".colp-body");
     innerEl = root.querySelector(".colp-inner");
     toastEl = root.querySelector(".col-toast");
-    base = null; second = null; history = [];
+    pickEl = root.querySelector(".col-pickbox");
+    svEl = root.querySelector(".col-sv"); svhEl = root.querySelector(".col-svh");
+    hueEl = root.querySelector(".col-hue"); huehEl = root.querySelector(".col-hueh");
+    base = null; second = null; history = []; dragging = false;
     innerEl.innerHTML = PH_HTML;
     root.addEventListener("click", onClick);
-    // hang an eyedropper off the omnibox so you can grab a colour from the wallpaper while exploring
-    if (api.setButtons) api.setButtons(api.hasWallpaper && api.hasWallpaper() ? [{
-      title: "Pick a colour from the wallpaper",
-      svg: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"></path><path d="M3 21v-3l9-9"></path><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path></svg>`,
-      onClick: () => api.pickFromWallpaper && api.pickFromWallpaper((hex) => setBase(parseColor(hex), true)),
-    }] : []);
+    svEl.addEventListener("pointerdown", (e) => dragStart(svEl, svFromPointer, e));
+    svEl.addEventListener("pointermove", (e) => { if (dragging) svFromPointer(e); });
+    hueEl.addEventListener("pointerdown", (e) => dragStart(hueEl, hueFromPointer, e));
+    hueEl.addEventListener("pointermove", (e) => { if (dragging) hueFromPointer(e); });
+    const endDrag = () => { dragging = false; };
+    [svEl, hueEl].forEach((el) => { el.addEventListener("pointerup", endDrag); el.addEventListener("pointercancel", endDrag); });
+    // the plugin hangs its OWN tools off the omnibox: a visual picker, and (with a photo) a wallpaper eyedropper
+    const PALETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C22 6 17.5 2 12 2Z"></path><circle cx="6.5" cy="11.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="9.5" cy="7.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="14.5" cy="7.5" r="1" fill="currentColor" stroke="none"></circle><circle cx="17.5" cy="11.5" r="1" fill="currentColor" stroke="none"></circle></svg>`;
+    const PIPETTE_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"></path><path d="M3 21v-3l9-9"></path><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path></svg>`;
+    const btns = [{ title: "Visual colour picker", svg: PALETTE_SVG, onClick: togglePicker }];
+    if (api.hasWallpaper && api.hasWallpaper()) btns.push({ title: "Pick a colour from the wallpaper", svg: PIPETTE_SVG, onClick: () => api.pickFromWallpaper && api.pickFromWallpaper((hex) => setBase(parseColor(hex), true)) });
+    if (api.setButtons) api.setButtons(btns);
     fit();
   },
   onInput(text) {
@@ -351,9 +430,9 @@ const plugin = {
   },
   unmount() {
     if (styleEl) styleEl.remove();
-    clearTimeout(toastT);
-    api = scrollEl = innerEl = toastEl = styleEl = null;
-    base = null; second = null; history = [];
+    clearTimeout(toastT); if (rafId) cancelAnimationFrame(rafId); rafId = 0;
+    api = scrollEl = bodyEl = innerEl = toastEl = styleEl = pickEl = svEl = svhEl = hueEl = huehEl = null;
+    base = null; second = null; history = []; dragging = false;
   },
 };
 export default plugin;

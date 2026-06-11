@@ -69,6 +69,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
       twinkling stars at night, drifting clouds, rain, snow and the odd lightning
       flash. Track the live forecast or pin a scene; Sky Auto/Day/Night; Auto/
       Light/Dark text.
+    - **Matrix rain** — the classic cascading glyph columns with bright heads and
+      fading trails. Four colours, Ambient/Lively/Bold speed, Auto/Light/Dark text.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.
@@ -144,8 +146,16 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     **Openverse** (Creative-Commons, aggregated from Flickr, museums and more) or
     **Wikimedia Commons**. Results come back as a thumbnail grid; click one to
     open a **lightbox** — the image large with **creator + licence attribution**
-    and a link to the source. `←`/`→` browse the set, `esc` closes the viewer.
-    Mature content is filtered; please honour each licence and credit the creator.
+    and a link to the source, plus a **download** button. `←`/`→` browse the set,
+    `esc` closes the viewer. Mature content is filtered; please honour each licence
+    and credit the creator.
+  - 🗺️ **Map** (`@@`) — keyless **place search** on an **OpenStreetMap** map (no
+    Google, no API key). Type a place to geocode it (Open-Meteo, the same service
+    the weather uses), pin it, and pick between matches; a deep link opens it on
+    openstreetmap.org. **Expand** (or `↵`) to a full-screen map, `esc` to close.
+    OSM's own tiles, dark-themed locally with a CSS filter — nothing is fetched
+    from a third-party tile provider. Uses a lazy-loaded, **self-hosted** copy of
+    Leaflet (`plugins/vendor/`).
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
@@ -186,9 +196,16 @@ bar, with full history/autocomplete.)
   - We deliberately **do not** embed an Unsplash/Pexels API key or proxy through
     anyone else's backend — that would breach those APIs' terms.
 - Local-folder mode is fully offline.
+- Plugins use only **keyless** providers too: dictionaryapi.dev, Datamuse and
+  Wikipedia (dictionary); Openverse and Wikimedia Commons (images); Open-Meteo
+  geocoding and OpenStreetMap tiles (map); BigDataCloud reverse geocoding (to name
+  your location for the weather). No API keys, no proxy backends.
+- [Leaflet](https://leafletjs.com) (BSD-2-Clause) is **vendored** under
+  `plugins/vendor/` and served from your own origin — never a CDN at runtime.
 - Ships with `<meta name="robots" content="noindex, nofollow">` so a hosted copy
   stays out of search results — remove it if you want it indexed.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE). Bundles [Leaflet](https://leafletjs.com) (BSD-2-Clause) under
+`plugins/vendor/`.

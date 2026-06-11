@@ -37,9 +37,16 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     a dropdown also lists your *other* matching sites (`↓` to pick) — merged with
     web suggestions when those are on. Private to your browser; toggle it, or wipe
     it all, in settings.
-- 🖼️ **Background of the day** from keyless providers, with photographer credit:
-  - **Photos (Picsum)** — [Lorem Picsum](https://picsum.photos), no API key, images from Unsplash
-  - **Favourites** — ⭐ any photo (stored by id, no files needed) and cycle through them
+- 🖼️ **Backgrounds** from keyless providers, with photographer credit:
+  - **Photos** — fresh wallpapers from [Lorem Picsum](https://picsum.photos) (no API
+    key, images from Unsplash), blended with your ⭐ favourites by a single
+    **"Show new images"** slider — *Never · Rarely · Sometimes · Often · Always*.
+    Set it to *Rarely* and you mostly see your own favourites, with the occasional
+    newcomer to consider keeping. (Unlocks once you've favourited 5.)
+  - **Per-favourite look** — favourite a photo and a **customise** button appears
+    beside the ⭐: blur, brightness and tint are saved *with that favourite*, so it
+    always reappears looking just-so. New and un-tuned images use an adjustable
+    **default look**.
   - **Local folder** — drop your own wallpapers in `backgrounds/`
   - **Solid colour**
   - ⬇ **Download** the current photo to keep it locally.
@@ -83,8 +90,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
-  (every tab / hourly / daily / never), blur, brightness, tint, weather, quick
-  links, and more. Settings persist in `localStorage`.
+  (every tab / hourly / daily / never), the new-images mix, default & per-favourite
+  image look, weather, quick links, and more. Settings persist in `localStorage`.
 
 ## Use it as your browser start page
 

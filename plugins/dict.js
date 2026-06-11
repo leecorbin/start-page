@@ -34,8 +34,8 @@ const CSS = `
 .dx-wiki { display: flex; gap: 0.7rem; align-items: flex-start; }
 .dx-thumb { flex: none; width: 72px; height: 72px; object-fit: cover; border-radius: 9px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); cursor: zoom-in; }
 .dx-thumb:hover { outline: 2px solid rgba(255,255,255,0.5); outline-offset: -2px; }
-.dx-imgview { display: flex; justify-content: center; padding-top: 0.6rem; }
-.dx-imgview img { max-width: 100%; max-height: 52vh; border-radius: 10px; box-shadow: 0 6px 26px rgba(0,0,0,0.45); }
+.dx-imgview { display: flex; align-items: center; justify-content: center; padding-top: 0.6rem; }
+.dx-imgview img { max-width: 100%; border-radius: 10px; box-shadow: 0 6px 26px rgba(0,0,0,0.45); object-fit: contain; }
 .dx-wikitext { flex: 1; min-width: 0; }
 .dx-wikitext p { margin: 0 0 0.3rem; line-height: 1.45; font-size: 0.88rem; }
 .dx-wikilink { color: var(--accent, #5b9bff); text-decoration: none; font-size: 0.82rem; }
@@ -66,7 +66,8 @@ function uniq(arr, not) {
 
 /* ---- plugin-owned settings (own localStorage key; no core involvement) ---- */
 const DKEY = "startpage:dict";
-let SET = (() => { try { return Object.assign({ urban: false }, JSON.parse(localStorage.getItem(DKEY)) || {}); } catch { return { urban: false }; } })();
+const SET_DEFAULTS = { wiki: true, urban: false };
+let SET = (() => { try { return Object.assign({}, SET_DEFAULTS, JSON.parse(localStorage.getItem(DKEY)) || {}); } catch { return { ...SET_DEFAULTS }; } })();
 function persistSettings() { try { localStorage.setItem(DKEY, JSON.stringify(SET)); } catch {} }
 
 /* ---- sources (all keyless + CORS) ---- */
@@ -107,10 +108,10 @@ function lookup(word, push) {
   term = word;
   const g = ++gen;
   if (!cache[word]) {
-    cache[word] = { dict: undefined, dm: undefined, wiki: undefined, urban: SET.urban ? undefined : null };
+    cache[word] = { dict: undefined, dm: undefined, wiki: SET.wiki ? undefined : null, urban: SET.urban ? undefined : null };
     fetchDict(word).then((d) => done(g, word, "dict", d), () => done(g, word, "dict", null));
     fetchDatamuse(word).then((d) => done(g, word, "dm", d), () => done(g, word, "dm", null));
-    fetchWiki(word).then((d) => done(g, word, "wiki", d), () => done(g, word, "wiki", null));
+    if (SET.wiki) fetchWiki(word).then((d) => done(g, word, "wiki", d), () => done(g, word, "wiki", null));
     if (SET.urban) fetchUrban(word).then((d) => done(g, word, "urban", d), () => done(g, word, "urban", null));
   }
   render(true);
@@ -153,7 +154,7 @@ function buildView(word, d) {
   const trg = uniq(dm && dm.trg || [], word).slice(0, 16);
   if (trg.length) html += `<div class="dx-sec"><div class="dx-h">Related</div><div class="dx-chips">${trg.map(chip).join("")}</div></div>`;
 
-  const wiki = d.wiki;
+  const wiki = SET.wiki ? d.wiki : null;
   if (wiki === undefined) html += `<div class="dx-sec"><div class="dx-h">Wikipedia</div>${loading()}</div>`;
   else if (wiki && wiki.extract) {
     const link = wiki.content_urls && wiki.content_urls.desktop && wiki.content_urls.desktop.page;
@@ -175,13 +176,16 @@ function buildView(word, d) {
   return html;
 }
 function settingsView() {
+  const sw = (act, on, label) => `<button type="button" class="dx-switch${on ? " on" : ""}" data-act="${act}"><span class="dx-knob"></span><span class="dx-swlabel">${label}</span></button>`;
   return `<div class="dx-head"><button type="button" class="dx-back" data-act="settings-close" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">Sources &amp; options</span></div>
-    <div class="dx-sec"><div class="dx-h">Slang</div>
-    <button type="button" class="dx-switch${SET.urban ? " on" : ""}" data-act="toggle-urban"><span class="dx-knob"></span><span class="dx-swlabel">Urban Dictionary <em>— slang, user-submitted &amp; can be explicit</em></span></button>
-    <div class="dx-note">Dictionary, thesaurus and Wikipedia are always on. The toggle applies on your next lookup.</div></div>`;
+    <div class="dx-sec"><div class="dx-h">Optional sources</div>
+    ${sw("toggle-wiki", SET.wiki, `Wikipedia <em>— summary excerpt &amp; image</em>`)}
+    ${sw("toggle-urban", SET.urban, `Urban Dictionary <em>— slang, user-submitted &amp; can be explicit</em>`)}
+    <div class="dx-note">Dictionary &amp; thesaurus are always on. Changes apply on your next lookup.</div></div>`;
 }
 function imageView_() {
-  return `<div class="dx-head"><button type="button" class="dx-back" data-act="img-back" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">${esc(term)}</span></div><div class="dx-imgview"><img src="${esc(imageView)}" alt="" /></div>`;
+  const cap = Math.max(120, MAXH() - 76);   // leave room for the back-header + padding so the image is never clipped or scrolled
+  return `<div class="dx-head"><button type="button" class="dx-back" data-act="img-back" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">${esc(term)}</span></div><div class="dx-imgview"><img src="${esc(imageView)}" alt="" style="max-height:${cap}px" /></div>`;
 }
 function render(resetScroll) {
   if (!innerEl) return;
@@ -189,6 +193,7 @@ function render(resetScroll) {
   innerEl.innerHTML = imageView ? imageView_() : settingsOpen ? settingsView() : (term ? buildView(term, cache[term] || {}) : PH_HTML);
   if (scrollEl) scrollEl.scrollTop = resetScroll ? 0 : sv;
   fit();
+  if (imageView) { const im = innerEl.querySelector(".dx-imgview img"); if (im && !im.complete) im.onload = im.onerror = fit; }   // re-fit once the (capped) image has real dimensions
 }
 
 function onClick(e) {
@@ -201,6 +206,7 @@ function onClick(e) {
   if (e.target.closest('[data-act="back"]')) { if (history.length) { imageView = null; const p = history.pop(); if (api) api.setInput(p); lookup(p, false); } return; }
   const au = e.target.closest("[data-audio]");
   if (au) { try { new Audio(au.getAttribute("data-audio")).play(); } catch {} return; }
+  if (e.target.closest('[data-act="toggle-wiki"]')) { SET.wiki = !SET.wiki; persistSettings(); cache = {}; render(false); return; }
   if (e.target.closest('[data-act="toggle-urban"]')) { SET.urban = !SET.urban; persistSettings(); cache = {}; render(false); return; }
 }
 function toggleSettings() {
@@ -217,8 +223,8 @@ const HELP = `
 <table class="help-keys">
   <tr><td><kbd>definitions</kbd></td><td>by part of speech, with examples — and <kbd>▶</kbd> plays the pronunciation where available</td></tr>
   <tr><td><kbd>thesaurus</kbd></td><td>synonyms, antonyms &amp; related words (Datamuse + the dictionary)</td></tr>
-  <tr><td><kbd>wikipedia</kbd></td><td>a summary excerpt with a link, when an article exists</td></tr>
-  <tr><td><kbd>⚙</kbd></td><td>turn on <strong>Urban Dictionary</strong> for slang (off by default; user-submitted, can be explicit)</td></tr>
+  <tr><td><kbd>wikipedia</kbd></td><td>a summary excerpt + image with a link, when an article exists — click the image to enlarge it</td></tr>
+  <tr><td><kbd>⚙</kbd></td><td>toggle <strong>Wikipedia</strong> (on) and <strong>Urban Dictionary</strong> slang (off; user-submitted, can be explicit)</td></tr>
 </table>
 <p>This is the one plugin that uses the network, so it needs a connection — lookups are debounced and cached as you go.</p>`;
 

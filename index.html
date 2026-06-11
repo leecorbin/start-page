@@ -114,6 +114,10 @@
   .bang-chip img { width: 16px; height: 16px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
   .bang-chip .ql-glyph { font-size: 15px; }
   .bang-chip .ql-mono { width: 16px; height: 16px; font-size: 9px; }
+  .field.mode-plugin #plugin-chip { cursor: pointer; }                                   /* the chip doubles as a "back to search" button */
+  #plugin-chip:hover { background: rgba(91,155,255,0.34); border-color: rgba(91,155,255,0.7); }
+  #plugin-chip .chip-x { margin-left: 0.1rem; opacity: 0.65; font-size: 1.15em; line-height: 1; }
+  #plugin-chip:hover .chip-x { opacity: 1; }
   #q { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--fg); font-size: 1.15rem; padding: 0.95rem 0.75rem; font-family: inherit; }
   .hints { max-width: 92vw; text-align: center; line-height: 1.7; font-size: 0.8rem; color: var(--muted); text-shadow: var(--halo); }
   .hk { white-space: nowrap; }
@@ -161,6 +165,7 @@
   #plugin-bar[hidden] { display: none; }
   .plug-item { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: none; background: none; border-radius: 9px; cursor: pointer; opacity: 0.62; transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease; }
   .plug-item:hover { opacity: 1; background: rgba(255,255,255,0.08); transform: translateY(-2px); }
+  .plug-item.on { opacity: 1; background: rgba(91,155,255,0.24); box-shadow: inset 0 0 0 1px rgba(91,155,255,0.5); }
   .plug-item img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
   .plug-item:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   body.lc-light .plug-item img { filter: grayscale(1) brightness(0) drop-shadow(0 1px 2px rgba(255,255,255,0.5)); }
@@ -924,8 +929,12 @@ async function openPlugin(def, initial) {
   chip.innerHTML = "";
   chip.appendChild(makeGlyph(def.iconify ? { iconify: def.iconify } : { icon: def.icon }));
   chip.appendChild(document.createTextNode(def.title));
+  const cx = document.createElement("span"); cx.className = "chip-x"; cx.textContent = "×"; chip.appendChild(cx);
+  chip.title = "Back to search (esc)"; chip.setAttribute("role", "button");
+  chip.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closePlugin(); };   // click the chip to leave the plugin — no keyboard needed
   field.classList.remove("mode-url");
   field.classList.add("mode-plugin");
+  markPluginBar();
   input.value = (initial || "").trim(); updateClear();
   if (savedHintsHTML == null) savedHintsHTML = $("hints").innerHTML;
   setPluginHints([["", "loading…"]]);
@@ -971,8 +980,12 @@ function closePlugin() {
   field.classList.remove("mode-plugin");
   if (savedHintsHTML != null) $("hints").innerHTML = savedHintsHTML;
   input.value = "";
+  markPluginBar();
   updateMode(); updateClear();
   input.focus({ preventScroll: true });
+}
+function markPluginBar() {   // light the launcher of the plugin that's currently open (if the row is shown)
+  document.querySelectorAll("#plugin-bar .plug-item").forEach(b => b.classList.toggle("on", !!activePlugin && b.dataset.plugin === activePlugin.def.id));
 }
 
 /* ---- help / info popup (⌘/) ---- */
@@ -1515,12 +1528,13 @@ function renderPluginBar() {
   const list = PLUGINS.filter(p => !(S.disabledPlugins || []).includes(p.id));
   list.forEach(def => {
     const b = document.createElement("button");
-    b.type = "button"; b.className = "plug-item"; b.setAttribute("aria-label", def.title);
+    b.type = "button"; b.className = "plug-item"; b.dataset.plugin = def.id; b.setAttribute("aria-label", def.title);
+    if (activePlugin && activePlugin.def.id === def.id) b.classList.add("on");
     b.appendChild(makeGlyph(def.iconify ? { iconify: def.iconify } : { icon: def.icon }));
     const tip = document.createElement("span"); tip.className = "ql-tip"; tip.textContent = def.title; b.appendChild(tip);
     b.onclick = (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (activePlugin && activePlugin.def.id === def.id) return;
+      if (activePlugin && activePlugin.def.id === def.id) { closePlugin(); return; }   // click the lit launcher again to close
       if (activePlugin) closePlugin();
       openPlugin(def, "");
     };
@@ -1628,6 +1642,37 @@ function renderPluginToggles() {
   });
 }
 
+/* The "Local folder" source only makes sense when a backgrounds/ folder actually exists,
+   so we hide it on a typical hosted copy and reveal it when the folder announces itself. */
+const localOpt = $("s-provider") && $("s-provider").querySelector('option[value="local"]');
+let localProbed = false;
+function localShouldShowSync() { return S.bg.provider === "local" || (S.bg.local && S.bg.local.length) || location.protocol === "file:"; }
+function applyLocalOption(show) {
+  const sel = $("s-provider"); if (!sel || !localOpt) return;
+  const present = !!localOpt.parentNode;
+  if (show && !present) sel.insertBefore(localOpt, sel.querySelector('option[value="solid"]'));
+  else if (!show && present) sel.removeChild(localOpt);
+}
+async function detectLocalFolder() {                                   // does a backgrounds/ folder exist on this host?
+  if (localShouldShowSync()) return true;
+  for (const m of ["backgrounds/manifest.json", "backgrounds/index.json"]) {   // the clean, host-agnostic signal: a manifest that lists the images
+    try {
+      const r = await fetch(m, { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        if (Array.isArray(j) && j.length && !(S.bg.local && S.bg.local.length)) {
+          S.bg.local = j.filter(x => typeof x === "string"); save();          // bonus: auto-fill the file list from the manifest
+          if ($("s-local")) $("s-local").value = S.bg.local.join("\n");
+        }
+        return true;
+      }
+    } catch {}
+  }
+  try { const r = await fetch("backgrounds/", { cache: "no-store" }); if (r.ok && /href=|\.(jpe?g|png|webp|avif|gif)\b/i.test(await r.text())) return true; } catch {}   // or a server that lists the directory
+  return false;
+}
+async function probeLocalOnce() { if (localProbed) return; localProbed = true; if (!localShouldShowSync() && await detectLocalFolder()) applyLocalOption(true); }
+
 function bindControls() {
   const set = (id, v) => { const el = $(id); el.type === "checkbox" ? (el.checked = v) : (el.value = v); };
   set("s-provider", S.bg.provider); set("s-frequency", S.bg.frequency); set("s-newImages", S.bg.newImages);
@@ -1637,6 +1682,7 @@ function bindControls() {
   set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-freqMin", S.freqMinVisits);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
+  applyLocalOption(localShouldShowSync());                            // declutter the source list until a backgrounds/ folder is found
   syncDataWhen();
   renderLinkEditor();
   renderBangEditor();
@@ -1710,7 +1756,7 @@ function switchTab(name) {
 }
 $("tab-btn-settings").onclick = () => switchTab("settings");
 $("tab-btn-links").onclick = () => switchTab("links");
-$("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.toggle("open"); };
+$("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.toggle("open"); if (panel.classList.contains("open")) probeLocalOnce(); };
 // Keep clicks inside the panel from reaching the "click-outside closes" handler.
 // (Reorder/delete rebuild the editor and detach the clicked node, which would
 // otherwise read as an outside click and dismiss the panel.)

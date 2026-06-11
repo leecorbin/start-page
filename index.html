@@ -213,6 +213,8 @@
   #panel code { background: rgba(255,255,255,0.10); border-radius: 4px; padding: 0.05rem 0.3rem; font-size: 0.82em; }
   .minibtn { background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.85rem; padding: 0.4rem 0.55rem; cursor: pointer; }
   .minibtn:hover { background: rgba(255,255,255,0.18); }
+  .minibtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .minibtn:disabled:hover { background: rgba(255,255,255,0.10); }
   #wx-status { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
 
   /* link editor */
@@ -1564,7 +1566,7 @@ function switchTab(name) {
 }
 $("tab-btn-settings").onclick = () => switchTab("settings");
 $("tab-btn-links").onclick = () => switchTab("links");
-$("gear").onclick = (e) => { e.stopPropagation(); panel.classList.toggle("open"); };
+$("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.toggle("open"); };
 // Keep clicks inside the panel from reaching the "click-outside closes" handler.
 // (Reorder/delete rebuild the editor and detach the clicked node, which would
 // otherwise read as an outside click and dismiss the panel.)

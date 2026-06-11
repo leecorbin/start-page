@@ -108,6 +108,10 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     **bit grid** you click to toggle, **UUID v4** (`uuid 5`), **Unix timestamps**
     (`ts 1718000000`, `now`), **Base64** and **URL** encode/decode (`b64 …`, `url …`),
     and **SHA-1/256** hashes — all click-to-copy.
+  - 🔤 **Text** (`,,`) — paste or type text and get every **case** (UPPER, lower,
+    Title, Sentence, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE),
+    a **slug**, reverse, trimmed, and **counts** (chars/words/lines/bytes) — each
+    click-to-copy. The clear `×` resets it for the next snippet.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

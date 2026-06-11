@@ -8,14 +8,23 @@ const CSS = `
 .colp-inner { padding: 0.55rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.65rem; }
 .col-ph { padding: 0.7rem 0.3rem; color: rgba(244,246,251,0.42); font-size: 0.85rem; line-height: 1.7; }
 .col-ph code { background: rgba(255,255,255,0.08); border-radius: 5px; padding: 0.05rem 0.35rem; }
-.col-hero { border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.12rem; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
-.col-hex { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
-.col-name { font-size: 0.79rem; opacity: 0.82; }
-.col-formats { display: flex; flex-direction: column; gap: 0.28rem; }
-.col-formats button { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.32rem 0.6rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+.col-hero { border-radius: 12px; padding: 0.78rem 0.9rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); }
+.col-heroL { display: flex; flex-direction: column; gap: 0.08rem; min-width: 0; }
+.col-hex { font-size: 1.42rem; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.col-name { font-size: 0.78rem; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-heroBtns { display: flex; gap: 0.35rem; flex: none; }
+.col-hbtn { font: inherit; font-size: 0.74rem; line-height: 1; padding: 0.36rem 0.62rem; border: none; border-radius: 8px; cursor: pointer; }
+.col-hbtn:disabled { opacity: 0.35; cursor: default; }
+.col-hint { text-transform: none; letter-spacing: 0; opacity: 0.7; }
+.col-formats { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.4rem; }
+.col-formats button { flex: 1 1 28%; min-width: 0; display: flex; flex-direction: column; gap: 0.06rem; align-items: flex-start; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.3rem 0.55rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
 .col-formats button:hover { background: rgba(255,255,255,0.12); }
-.col-formats .k { font-size: 0.62rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); flex: none; }
-.col-formats .v { font-variant-numeric: tabular-nums; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.col-formats .k { font-size: 0.6rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
+.col-formats .v { font-variant-numeric: tabular-nums; font-size: 0.83rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.col-copyline { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.18)); border-radius: 9px; padding: 0.32rem 0.6rem; color: var(--fg); font: inherit; cursor: pointer; text-align: left; }
+.col-copyline:hover { background: rgba(255,255,255,0.12); }
+.col-copyline .k { font-size: 0.6rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); flex: none; }
+.col-copyline .v { font-variant-numeric: tabular-nums; font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-sec { display: flex; flex-direction: column; gap: 0.32rem; }
 .col-h { font-size: 0.62rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
 .col-row { display: flex; align-items: center; gap: 0.5rem; }
@@ -217,29 +226,36 @@ function ramp(rgb) {
 const fmtRgb = (c) => `rgb(${c.r}, ${c.g}, ${c.b})`;
 function fmtHsl(c) { const { h, s, l } = rgbToHsl(c); return `hsl(${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%)`; }
 function fmtOklch(c) { const { L, C, h } = rgbToOklch(c); return `oklch(${L.toFixed(3)} ${C.toFixed(3)} ${h.toFixed(1)})`; }
+const rgbVals = (c) => `${c.r}, ${c.g}, ${c.b}`;
+function hslVals(c) { const { h, s, l } = rgbToHsl(c); return `${Math.round(h)}, ${Math.round(s * 100)}%, ${Math.round(l * 100)}%`; }
+function oklchVals(c) { const { L, C, h } = rgbToOklch(c); return `${L.toFixed(2)} ${C.toFixed(3)} ${h.toFixed(0)}`; }
 const badge = (r) => (r >= 7 ? "AAA" : r >= 4.5 ? "AA" : r >= 3 ? "AA large" : "fail");
-const fmtBtn = (k, v) => `<button type="button" data-copy="${v}" title="Copy ${v}"><span class="k">${k}</span><span class="v">${v}</span></button>`;
-const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-copy="${hex}" title="${hex}" style="background:${hex}"></button>`; };
+// data-copy → copies; data-set → becomes the main colour (explore)
+const fmtChip = (k, disp, copy, title) => `<button type="button" data-copy="${copy}" title="${title || ("Copy " + copy)}"><span class="k">${k}</span><span class="v">${disp}</span></button>`;
+const copyLine = (k, v) => `<button type="button" class="col-copyline" data-copy="${v}" title="Copy ${v}"><span class="k">${k}</span><span class="v">${v}</span></button>`;
+const swatch = (rgb) => { const hex = toHex(rgb); return `<button type="button" class="sw" data-set="${hex}" title="${hex} — click to explore" style="background:${hex}"></button>`; };
+const swatchStatic = (rgb) => { const hex = toHex(rgb); return `<div class="sw" title="${hex}" style="background:${hex}"></div>`; };
 
-function buildInner(colors) {
-  const c = colors[0], hex = toHex(c);
+function buildInner(c, second) {
+  const hex = toHex(c);
   const textC = contrast(c, { r: 0, g: 0, b: 0 }) >= contrast(c, { r: 255, g: 255, b: 255 }) ? "#000" : "#fff";
+  const btnBg = textC === "#000" ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.22)";
   const nm = nearestName(c), nameLabel = nm.exact ? nm.name : "≈ " + nm.name;
   const cw = contrast(c, { r: 255, g: 255, b: 255 }), ck = contrast(c, { r: 0, g: 0, b: 0 });
   const best = ck >= cw ? { t: "black", r: ck } : { t: "white", r: cw };
   let html = "";
-  html += `<div class="col-hero" data-copy="${hex}" style="background:${hex};color:${textC}"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel} · click to copy</div></div>`;
-  html += `<div class="col-formats">${fmtBtn("RGB", fmtRgb(c))}${fmtBtn("HSL", fmtHsl(c))}${fmtBtn("OKLCH", fmtOklch(c))}</div>`;
+  html += `<div class="col-hero" style="background:${hex};color:${textC}"><div class="col-heroL"><div class="col-hex">${hex}</div><div class="col-name">${nameLabel}</div></div><div class="col-heroBtns"><button type="button" class="col-hbtn" data-act="back" ${history.length ? "" : "disabled"} style="background:${btnBg};color:${textC}" title="Back" aria-label="Back">←</button><button type="button" class="col-hbtn" data-copy="${hex}" style="background:${btnBg};color:${textC}" title="Copy ${hex}">Copy</button></div></div>`;
+  html += `<div class="col-formats">${fmtChip("RGB", rgbVals(c), fmtRgb(c))}${fmtChip("HSL", hslVals(c), fmtHsl(c))}${fmtChip("OKLCH", oklchVals(c), fmtOklch(c), "OKLCH — a modern, perceptually even colour space: lightness · chroma · hue (CSS Color 4). Click copies the CSS value.")}</div>`;
   html += `<div class="col-sec"><div class="col-h">Contrast</div><div class="col-contrast"><div class="col-ct" style="background:${hex};color:#fff"><b>Aa</b><span>${cw.toFixed(2)} · ${badge(cw)}</span></div><div class="col-ct" style="background:${hex};color:#000"><b>Aa</b><span>${ck.toFixed(2)} · ${badge(ck)}</span></div></div><div class="col-best">Best text: ${best.t} — ${best.r.toFixed(2)}:1 (${badge(best.r)})</div></div>`;
-  html += `<div class="col-sec"><div class="col-h">Harmonies</div>` +
+  html += `<div class="col-sec"><div class="col-h">Harmonies <span class="col-hint">· click to explore</span></div>` +
     Object.entries(harmonies(c)).map(([k, arr]) => `<div class="col-row"><span class="lab">${k}</span><span class="col-sws">${arr.map(swatch).join("")}</span></div>`).join("") + `</div>`;
   html += `<div class="col-sec"><div class="col-h">Tints &amp; shades</div><div class="col-ramp">${ramp(c).map(swatch).join("")}</div></div>`;
-  if (colors.length >= 2) {
-    const g = `linear-gradient(90deg, ${hex}, ${toHex(colors[1])})`;
-    html += `<div class="col-sec"><div class="col-h">Gradient</div><div class="col-gbar" style="background:${g}"></div><div class="col-formats">${fmtBtn("CSS", g)}</div></div>`;
+  if (second) {
+    const g = `linear-gradient(90deg, ${hex}, ${toHex(second)})`;
+    html += `<div class="col-sec"><div class="col-h">Gradient</div><div class="col-gbar" style="background:${g}"></div>${copyLine("CSS", g)}</div>`;
   }
   html += `<div class="col-sec"><div class="col-h">Colour vision</div><div class="col-cvd">` +
-    Object.entries(CVD).map(([k, m]) => `<div>${swatch(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
+    Object.entries(CVD).map(([k, m]) => `<div>${swatchStatic(simCvd(c, m))}<span class="lab">${k}</span></div>`).join("") + `</div></div>`;
   return html;
 }
 
@@ -247,23 +263,30 @@ function buildInner(colors) {
 const HELP = `
 <p>Type any colour into the box — <em>#5b9bff</em>, <em>rgb(91 155 255)</em>, <em>hsl(217 100% 68%)</em>,
 <em>oklch(.68 .16 256)</em>, or a CSS name like <em>cornflowerblue</em>. The <kbd>#</kbd> is optional.</p>
+<p><strong>Click any swatch</strong> (harmony or tint) to make it the main colour — everything
+recalculates around it, so you can travel complementary → analogous → … to the perfect
+shade, then <strong>Copy</strong>. <kbd>←</kbd> steps back through where you've been.</p>
 <h3>What you get</h3>
 <table class="help-keys">
-  <tr><td><kbd>formats</kbd></td><td>HEX · RGB · HSL · OKLCH — click any to copy</td></tr>
+  <tr><td><kbd>formats</kbd></td><td>RGB · HSL · OKLCH — click a value to copy its CSS</td></tr>
   <tr><td><kbd>contrast</kbd></td><td>WCAG ratios on white &amp; black, with AA/AAA and the best text colour</td></tr>
   <tr><td><kbd>harmonies</kbd></td><td>complementary, analogous, triadic, tetradic</td></tr>
   <tr><td><kbd>tints</kbd></td><td>a light-to-dark ramp</td></tr>
   <tr><td><kbd>gradient</kbd></td><td>type two colours — <em>#5b9bff #ff5b9b</em></td></tr>
   <tr><td><kbd>vision</kbd></td><td>how it reads under colour-blindness (prot/deuter/trit)</td></tr>
 </table>
+<p><em>OKLCH</em> is a modern, perceptually even colour space (lightness · chroma · hue) — equal
+steps look equally different, which is why it's great for palettes and gradients.</p>
 <h3>Keys</h3>
 <table class="help-keys">
-  <tr><td><kbd>↵</kbd></td><td>copy the hex</td></tr>
-  <tr><td><kbd>click</kbd></td><td>copy any swatch or value</td></tr>
+  <tr><td><kbd>click</kbd></td><td>a swatch → make it the main colour</td></tr>
+  <tr><td><kbd>Copy / ↵</kbd></td><td>copy the main colour's hex</td></tr>
+  <tr><td><kbd>←</kbd></td><td>step back to the previous colour</td></tr>
   <tr><td><kbd>esc</kbd></td><td>back to the omnibox</td></tr>
 </table>`;
 
-let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0, lastColors = null;
+let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, toastT = 0;
+let base = null, second = null, history = [];
 
 const MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));
 function fit() { if (innerEl) api.setHeight(Math.min(innerEl.offsetHeight, MAXH())); }
@@ -272,15 +295,31 @@ function toast(msg) {
   toastEl.textContent = msg; toastEl.classList.add("show");
   clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove("show"), 1100);
 }
+function render() {
+  innerEl.innerHTML = base ? buildInner(base, second) : PH_HTML;
+  if (scrollEl) scrollEl.scrollTop = 0;
+  fit();
+}
+function setBase(rgb, pushHist) {
+  if (!rgb) return;
+  if (pushHist && base) history.push(base);
+  base = rgb; second = null;
+  if (api) api.setInput(toHex(rgb).slice(1));   // keep the omnibox in sync (the ## chip owns the hash)
+  render();
+}
 function onClick(e) {
-  const el = e.target.closest("[data-copy]"); if (!el) return;
-  const v = el.getAttribute("data-copy");
-  try { navigator.clipboard.writeText(v); } catch {}
-  toast("Copied " + v);
+  const setEl = e.target.closest("[data-set]");
+  if (setEl) { setBase(parseColor(setEl.getAttribute("data-set")), true); return; }   // explore: becomes the main colour
+  if (e.target.closest('[data-act="back"]')) {
+    if (history.length) { base = history.pop(); second = null; if (api) api.setInput(toHex(base).slice(1)); render(); }
+    return;
+  }
+  const copyEl = e.target.closest("[data-copy]");
+  if (copyEl) { const v = copyEl.getAttribute("data-copy"); try { navigator.clipboard.writeText(v); } catch {} toast("Copied " + v); }
 }
 
 const plugin = {
-  hints: [["↵", "copy hex"], ["click", "copy"], ["#a #b", "gradient"]],
+  hints: [["click", "explore"], ["↵", "copy main"], ["#a #b", "gradient"]],
   help: HELP,
   mount(root, hostApi) {
     api = hostApi;
@@ -289,33 +328,27 @@ const plugin = {
     scrollEl = root.querySelector(".colp");
     innerEl = root.querySelector(".colp-inner");
     toastEl = root.querySelector(".col-toast");
+    base = null; second = null; history = [];
     innerEl.innerHTML = PH_HTML;
-    lastColors = null;
     root.addEventListener("click", onClick);
     fit();
   },
   onInput(text) {
     const t = (text || "").trim();
-    if (!t) { innerEl.innerHTML = PH_HTML; lastColors = null; fit(); return; }
+    if (!t) { base = null; second = null; history = []; render(); return; }
     const colors = findColors(t);
-    if (!colors.length) { if (!lastColors) { innerEl.innerHTML = PH_HTML; fit(); } return; }  // keep last good while mid-type
-    lastColors = colors;
-    innerEl.innerHTML = buildInner(colors);
-    if (scrollEl) scrollEl.scrollTop = 0;
-    fit();
+    if (!colors.length) { if (!base) render(); return; }   // keep last good while mid-type
+    base = colors[0]; second = colors[1] || null; history = [];   // typing is a fresh starting point
+    render();
   },
-  onEnter(text) {
-    const colors = findColors((text || "").trim());
-    if (!colors.length) return;
-    const hex = toHex(colors[0]);
-    try { navigator.clipboard.writeText(hex); } catch {}
-    toast("Copied " + hex);
+  onEnter() {
+    if (base) { const hex = toHex(base); try { navigator.clipboard.writeText(hex); } catch {} toast("Copied " + hex); }
   },
   unmount() {
     if (styleEl) styleEl.remove();
     clearTimeout(toastT);
     api = scrollEl = innerEl = toastEl = styleEl = null;
-    lastColors = null;
+    base = null; second = null; history = [];
   },
 };
 export default plugin;

@@ -829,8 +829,8 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
    Module contract: export default { hints, mount(root, api), onInput(text),
    onEnter(text), unmount() } — api: { setInput, getInput, setHeight, close }. */
 const PLUGINS = [
-  { id: "calc", trigger: "==", title: "Calculator", icon: "=", height: 210, src: "./plugins/calc.js" },
-  { id: "color", trigger: "#", title: "Colour", icon: "#", height: 96, src: "./plugins/color.js" },
+  { id: "calc", trigger: "==", title: "Calculator", icon: "=", iconify: "lucide:calculator", height: 210, src: "./plugins/calc.js" },
+  { id: "color", trigger: "##", title: "Colour", icon: "#", iconify: "lucide:palette", height: 96, src: "./plugins/color.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");
@@ -847,7 +847,7 @@ async function openPlugin(def, initial) {
   closeSuggest();
   const chip = $("plugin-chip");
   chip.innerHTML = "";
-  chip.appendChild(makeGlyph({ icon: def.icon }));
+  chip.appendChild(makeGlyph(def.iconify ? { iconify: def.iconify } : { icon: def.icon }));
   chip.appendChild(document.createTextNode(def.title));
   field.classList.remove("mode-url");
   field.classList.add("mode-plugin");
@@ -1349,6 +1349,12 @@ function brandSlug(host) {
 }
 function monogramFor(l) { const m = document.createElement("span"); m.className = "ql-mono"; m.textContent = initial(l); return m; }
 function makeGlyph(l) {
+  if (l.iconify) {                                          // a specific Iconify icon (e.g. plugin chips)
+    const [set, name] = l.iconify.split(":");
+    const img = document.createElement("img"); img.alt = ""; img.loading = "lazy";
+    img.src = `https://api.iconify.design/${set}/${name}.svg`;
+    return img;
+  }
   if (l.icon) { const s = document.createElement("span"); s.className = "ql-glyph"; s.textContent = l.icon; return s; }
   const host = hostOf(l.url);
   const favicon = `https://icons.duckduckgo.com/ip3/${host}.ico`;

@@ -1302,7 +1302,8 @@ function openWpPop(trigger) {
 function closeWpPop() { const p = $("wp-pop"); if (p) p.hidden = true; }
 $("wp-cfg").onclick = (e) => { e.stopPropagation(); const p = $("wp-pop"); p.hidden ? openWpPop(e.currentTarget) : closeWpPop(); };
 $("wp-pop-close").onclick = closeWpPop;
-document.addEventListener("click", (e) => { const p = $("wp-pop"); if (!p.hidden && !p.contains(e.target) && e.target.closest("#wp-cfg") == null) closeWpPop(); });
+// capture phase: runs before a wallpaper's settings() re-renders the popover (which would detach e.target and look "outside")
+document.addEventListener("click", (e) => { const p = $("wp-pop"); if (!p.hidden && !p.contains(e.target) && !e.target.closest("#wp-cfg")) closeWpPop(); }, true);
 
 /* favourites + download */
 function isFav(d) { return d && FAVS.some(f => f.provider === d.provider && String(f.ref) === String(d.ref)); }
@@ -1518,6 +1519,14 @@ async function geocode(name) {
   const g = j.results[0];
   S.weather.lat = g.latitude; S.weather.lon = g.longitude; S.weather.place = g.name; save();
   return g.name;
+}
+async function reverseGeocode(lat, lon) {                          // coords → a place name (keyless); Open-Meteo's geocoder is forward-only
+  try {
+    const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+    if (!r.ok) return "";
+    const j = await r.json();
+    return j.city || j.locality || j.principalSubdivision || "";
+  } catch { return ""; }
 }
 function renderWeather(cur) {
   if (!cur) { $("weather").hidden = true; return; }
@@ -1808,7 +1817,11 @@ function bindControls() {
     if (!navigator.geolocation) { wxStatus("Geolocation unavailable"); return; }
     wxStatus("Locating…");
     navigator.geolocation.getCurrentPosition(
-      p => { S.weather.lat = p.coords.latitude; S.weather.lon = p.coords.longitude; S.weather.place = ""; S.weather.location = ""; $("s-wx-loc").value = ""; save(); wxStatus("✓ Using your location"); loadWeather(); },
+      p => {
+        S.weather.lat = p.coords.latitude; S.weather.lon = p.coords.longitude; S.weather.place = ""; S.weather.location = ""; $("s-wx-loc").value = ""; save();
+        wxStatus("✓ Using your location"); loadWeather();
+        reverseGeocode(p.coords.latitude, p.coords.longitude).then(name => { if (name) { S.weather.place = name; save(); wxStatus("✓ " + name); loadWeather(); } });   // fill in the city name
+      },
       () => wxStatus("Location blocked — type a city instead"));
   };
 

@@ -1247,6 +1247,7 @@ async function refreshBackground(force) {
    core stays agnostic — no per-wallpaper code, just this generic host. */
 const WALLPAPERS = [
   { id: "lava", title: "Lava lamp", src: "./plugins/wp-lava.js" },
+  { id: "weather", title: "Weatherscape", src: "./plugins/wp-weather.js" },
 ];
 let activeWallpaper = null, wpGen = 0;
 const wallpaperApi = {

@@ -175,7 +175,13 @@
   .tp-row input[type="range"] { width: 128px; accent-color: var(--accent); }
   .tp-tint { display: flex; align-items: center; gap: 0.4rem; }
   .tp-tint input[type="color"] { width: 28px; height: 22px; padding: 0; border: 1px solid var(--field-border); border-radius: 6px; background: none; cursor: pointer; }
-  .tp-tint input[type="range"] { width: 80px; }
+  .tp-tint input[type="range"] { width: 64px; }
+  .tp-pick { flex: none; display: inline-grid; place-items: center; width: 27px; height: 24px; padding: 0; background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 6px; color: var(--fg); cursor: pointer; }
+  .tp-pick svg { width: 15px; height: 15px; }
+  .tp-pick:hover, .tp-pick.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  body.eyedropping, body.eyedropping * { cursor: crosshair !important; }
+  #defaultlook-note { font-size: 0.72rem; color: var(--muted); }
+  #defaultlook-note:empty { display: none; }
 
   /* "show new images" slider */
   .newimg-top { display: flex; justify-content: space-between; align-items: baseline; }
@@ -331,7 +337,7 @@
       <div class="tp-head"><span id="tp-title">Image look</span><button class="minibtn" id="tp-reset">Reset</button><button class="tp-x" id="tp-close" aria-label="Close">×</button></div>
       <div class="tp-row"><span>Blur</span><input id="tp-blur" type="range" min="0" max="40" step="1" /></div>
       <div class="tp-row"><span>Brightness</span><input id="tp-brightness" type="range" min="15" max="120" step="1" /></div>
-      <div class="tp-row"><span>Tint</span><span class="tp-tint"><input id="tp-tint" type="color" /><input id="tp-tintStrength" type="range" min="0" max="80" step="1" /></span></div>
+      <div class="tp-row"><span>Tint</span><span class="tp-tint"><button type="button" class="tp-pick" id="tp-pick" title="Pick a colour from the photo" aria-label="Pick a colour from the photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"></path><path d="M3 21v-3l9-9"></path><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"></path></svg></button><input id="tp-tint" type="color" /><input id="tp-tintStrength" type="range" min="0" max="80" step="1" /></span></div>
     </div>
   </div>
 
@@ -360,7 +366,10 @@
         <div class="newimg-labels"><span>Never</span><span>Rarely</span><span>Sometimes</span><span>Often</span><span>Always</span></div>
         <span id="newimg-lock"></span>
       </div>
-      <div class="row" data-when="photos local"><span>Default image look</span><button class="minibtn" id="s-defaultlook">Adjust…</button></div>
+      <div class="row col" data-when="photos local">
+        <div class="newimg-top"><span>Default image look</span><button class="minibtn" id="s-defaultlook">Adjust…</button></div>
+        <span id="defaultlook-note"></span>
+      </div>
       <div class="row" data-when="solid"><span>Colour</span><input id="s-solid" type="color" /></div>
       <div class="row col" data-when="local"><span>Files in <code>backgrounds/</code> — one per line</span><textarea id="s-local" placeholder="sunset.jpg&#10;forest.jpg"></textarea></div>
     </div>
@@ -1066,7 +1075,7 @@ function display(desc, instant) {
   applyBgStyle();                       // this image's look (a favourite's own, or the default)
   showImage(desc.url, desc.author, desc.link, instant);
   $("controls").classList.remove("no-image");
-  updateStar();
+  updateStar(); refreshDefaultLookBtn();
 }
 function emptyState(provider) {
   bgEl.classList.remove("loaded"); bgEl.style.backgroundImage = "none";
@@ -1120,7 +1129,7 @@ function toggleFav() {
   const i = FAVS.findIndex(f => f.provider === CURRENT.provider && String(f.ref) === String(CURRENT.ref));
   if (i >= 0) { FAVS.splice(i, 1); closeTune(); applyBgStyle(); }   // unstarred → revert to the default look
   else FAVS.push({ provider: CURRENT.provider, ref: CURRENT.ref, author: CURRENT.author, link: CURRENT.link });
-  saveFavs(); updateStar(); refreshNewImg();
+  saveFavs(); updateStar(); refreshNewImg(); refreshDefaultLookBtn();
 }
 async function downloadCurrent() {
   if (!CURRENT || !CURRENT.url) return;
@@ -1136,7 +1145,7 @@ async function downloadCurrent() {
 }
 $("dl").onclick = downloadCurrent;
 $("fav").onclick = toggleFav;
-$("tune").onclick = () => { const f = favOf(CURRENT); if (f) openTune(f); };
+$("tune").onclick = () => { const f = favOf(CURRENT); if (f) openTune(f, $("tune")); };
 
 /* Per-image "look" popover — the same controls tune either a favourite or the default. */
 let tuneTarget = null;                                              // a favourite object, or the string "default"
@@ -1151,13 +1160,25 @@ function showTuneValues() {
   $("tp-blur").value = L.blur; $("tp-brightness").value = L.brightness;
   $("tp-tint").value = L.tint; $("tp-tintStrength").value = L.tintStrength;
 }
-function openTune(t) {
+function positionTune(trigger) {                                   // float the popover beside whatever opened it
+  const pop = $("tune-pop");
+  if (!trigger) { pop.style.left = pop.style.top = pop.style.right = pop.style.bottom = ""; return; }
+  const pr = pop.getBoundingClientRect(), tr = trigger.getBoundingClientRect(), gap = 10;
+  let left = tr.left - pr.width - gap;                             // prefer the trigger's left…
+  if (left < 8) left = Math.min(tr.right + gap, innerWidth - pr.width - 8);   // …else its right
+  let top = tr.top + tr.height / 2 - pr.height / 2;               // vertically centred on it, clamped on-screen
+  top = Math.max(8, Math.min(top, innerHeight - pr.height - 8));
+  pop.style.left = Math.max(8, left) + "px"; pop.style.top = top + "px";
+  pop.style.right = "auto"; pop.style.bottom = "auto";
+}
+function openTune(t, trigger) {
   tuneTarget = t;
   $("tp-title").textContent = t === "default" ? "Default image look" : "This favourite";
   showTuneValues();
   $("tune-pop").hidden = false;
+  positionTune(trigger);                                          // measure + place before the browser paints (no flash)
 }
-function closeTune() { $("tune-pop").hidden = true; tuneTarget = null; }
+function closeTune() { endPick(); $("tune-pop").hidden = true; tuneTarget = null; }
 function tuneChanged() {
   if (!tuneTarget) return;
   const L = writeLook(tuneTarget);
@@ -1165,15 +1186,52 @@ function tuneChanged() {
   L.tint = $("tp-tint").value; L.tintStrength = +$("tp-tintStrength").value;
   tuneTarget === "default" ? save() : saveFavs();
   applyBgStyle(); if (lastImg) analyzeContrast(lastImg);           // live preview on the current image
+  refreshDefaultLookBtn();
 }
 function resetTune() {
   if (tuneTarget === "default") { Object.assign(S.bg, { blur: 0, brightness: 70, tint: "#000000", tintStrength: 0 }); save(); }
   else { delete tuneTarget.look; saveFavs(); }                     // a favourite reset just drops back to the default
   showTuneValues(); applyBgStyle(); if (lastImg) analyzeContrast(lastImg);
+  refreshDefaultLookBtn();
+}
+/* The default look can't touch a favourite that has its own — disable it there so it doesn't seem to do nothing. */
+function refreshDefaultLookBtn() {
+  const b = $("s-defaultlook"); if (!b) return;
+  const customFav = !!(favOf(CURRENT) && favOf(CURRENT).look);
+  b.disabled = customFav;
+  $("defaultlook-note").textContent = customFav ? "This favourite has its own look — tap the ✦ button to adjust it." : "";
 }
 ["tp-blur", "tp-brightness", "tp-tint", "tp-tintStrength"].forEach(id => $(id).oninput = tuneChanged);
 $("tp-reset").onclick = resetTune;
 $("tp-close").onclick = closeTune;
+
+/* Eyedropper — sample a colour straight out of the current photo for the tint (no native EyeDropper in Safari). */
+let picking = false;
+function startPick() { if (lastImg && tuneTarget) { picking = true; document.body.classList.add("eyedropping"); $("tp-pick").classList.add("active"); } }
+function endPick() { picking = false; document.body.classList.remove("eyedropping"); const p = $("tp-pick"); if (p) p.classList.remove("active"); }
+function samplePixel(cx, cy) {
+  const iw = lastImg.naturalWidth, ih = lastImg.naturalHeight, vw = innerWidth, vh = innerHeight;
+  const scale = Math.max(vw / iw, vh / ih);                        // background-size: cover, centred
+  let ix = (cx - (vw - iw * scale) / 2) / scale, iy = (cy - (vh - ih * scale) / 2) / scale;
+  ix = Math.max(0, Math.min(iw - 1, ix)); iy = Math.max(0, Math.min(ih - 1, iy));
+  const c = document.createElement("canvas"); c.width = c.height = 1;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(lastImg, ix, iy, 1, 1, 0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return "#" + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+$("tp-pick").onclick = (e) => { e.stopPropagation(); picking ? endPick() : startPick(); };
+document.addEventListener("click", (e) => {
+  if (!picking || $("tune-pop").contains(e.target)) return;       // let the popover's own controls work while picking
+  e.preventDefault(); e.stopPropagation();                        // sampling click shouldn't navigate or close the panel
+  try {
+    $("tp-tint").value = samplePixel(e.clientX, e.clientY);
+    if (+$("tp-tintStrength").value === 0) $("tp-tintStrength").value = 30;   // make the pick actually show
+    tuneChanged();
+  } catch {}
+  endPick();
+}, true);
+document.addEventListener("keydown", (e) => { if (picking && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endPick(); } }, true);
 
 /* New-images slider — readout + unlock state. */
 const NEWIMG_NAMES = { 0: "Never", 2: "Rarely", 4: "Sometimes", 6: "Often", 8: "Always" };
@@ -1438,13 +1496,14 @@ function bindControls() {
   renderLinkEditor();
   renderBangEditor();
   renderPluginToggles();
-  refreshNewImg();
+  refreshNewImg(); refreshDefaultLookBtn();
   if (S.weather.place) wxStatus("✓ " + S.weather.place);
 
   $("s-provider").onchange = () => { S.bg.provider = $("s-provider").value; syncDataWhen(); refreshNewImg(); save(); refreshBackground(true); };
   $("s-frequency").onchange = () => { S.bg.frequency = $("s-frequency").value; save(); refreshBackground(true); };
-  $("s-newImages").oninput = () => { S.bg.newImages = +$("s-newImages").value; save(); $("newimg-read").textContent = newImgReadout(); };   // takes effect on the next change
-  $("s-defaultlook").onclick = () => openTune("default");
+  $("s-newImages").oninput = () => { S.bg.newImages = +$("s-newImages").value; save(); $("newimg-read").textContent = newImgReadout(); };
+  $("s-newImages").onchange = () => { localStorage.removeItem(K.next); prefetchNext(); };   // re-roll the prefetched next tab for the new mix
+  $("s-defaultlook").onclick = () => openTune("default", $("s-defaultlook"));
   $("s-solid").oninput = () => { S.bg.solid = $("s-solid").value; save(); refreshBackground(true); };
   $("s-local").onchange = () => { S.bg.local = $("s-local").value.split("\n").map(x => x.trim()).filter(Boolean); save(); refreshBackground(true); };
 
@@ -1511,7 +1570,7 @@ $("gear").onclick = (e) => { e.stopPropagation(); panel.classList.toggle("open")
 // otherwise read as an outside click and dismiss the panel.)
 panel.addEventListener("click", (e) => e.stopPropagation());
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("open"); });
-document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target)) panel.classList.remove("open"); });
+document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) panel.classList.remove("open"); });
 document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });
 
 /* ============================ boot ============================ */

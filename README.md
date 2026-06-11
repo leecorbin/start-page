@@ -45,7 +45,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     newcomer to consider keeping. (Unlocks once you've favourited 5.)
   - **Per-favourite look** — favourite a photo and a **customise** button appears
     beside the ⭐: blur, brightness and tint are saved *with that favourite*, so it
-    always reappears looking just-so. New and un-tuned images use an adjustable
+    always reappears looking just-so. An **eyedropper** lets you pull a tint colour
+    straight out of the photo. New and un-tuned images use an adjustable
     **default look**.
   - **Local folder** — drop your own wallpapers in `backgrounds/`
   - **Solid colour**

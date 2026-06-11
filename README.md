@@ -5,6 +5,13 @@ optional lazy-loaded plugins) with no build step, no tracking, and no API keys.
 Host it anywhere or just open it locally.
 Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 
+The core stays tiny and instant; everything richer rides in optional files that
+only download when you use them — a **calculator** with live graphs, a **colour**
+lab, a **dictionary**, **image** and **map** search, a developer/text **tools**
+box, and animated **"living wallpapers"** (lava lamp, a weatherscape that matches
+your forecast, matrix rain). Every provider is **keyless** — no API keys, no
+backend, no Google.
+
 ![start-page running as a Safari new-tab page](screenshot.png)
 
 ## Features
@@ -92,8 +99,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
   visit most (above a min-visits threshold, excluding ones you've already pinned),
   with the same brand icons; hover an icon and tap × to forget it.
 - 🧩 **Plugins row** — an optional row of one-click launchers for your installed
-  plugins (calculator, colour…). Each of the three icon rows (quick links, frequent,
-  plugins) has its own **Off / Small / Medium / Large** control in Settings.
+  plugins. Each of the three icon rows (quick links, frequent, plugins) has its
+  own **Off / Small / Medium / Large** control in Settings.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always

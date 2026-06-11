@@ -11,7 +11,7 @@ const PALETTES = {
   violet: { name: "Violet", base: [9, 4, 18],  lit: "#a45ce0", head: "#e8ccff" },
 };
 const INTENSITY = {                       // idle = chance a column skips a frame (higher = slower/sparser); fade = trail length
-  ambient: { name: "Ambient", idle: 0.88, fade: 0.030 },
+  ambient: { name: "Ambient", idle: 0.93, fade: 0.028 },
   lively:  { name: "Lively",  idle: 0.62, fade: 0.050 },
   bold:    { name: "Bold",    idle: 0.28, fade: 0.075 },
 };

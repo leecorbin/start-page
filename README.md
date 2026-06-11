@@ -101,6 +101,11 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
     colour** and travel the palettes; a back arrow retraces your steps, and a Copy
     button grabs the one you settled on. Two colours (`#5b9bff #ff5b9b`) draw a
     **gradient** with copyable CSS. All offline maths.
+  - 🛠️ **Dev tools** (`;;`) — keyless developer utilities that route from what you
+    type: number **bases + bitwise** (`0xF0 & 0x0F`, `1 << 8`) with an interactive
+    **bit grid** you click to toggle, **UUID v4** (`uuid 5`), **Unix timestamps**
+    (`ts 1718000000`, `now`), **Base64** and **URL** encode/decode (`b64 …`, `url …`),
+    and **SHA-1/256** hashes — all click-to-copy.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

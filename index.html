@@ -872,6 +872,7 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 const PLUGINS = [
   { id: "calc", trigger: "==", title: "Calculator", icon: "=", iconify: "lucide:calculator", height: 210, src: "./plugins/calc.js" },
   { id: "color", trigger: "##", title: "Colour", icon: "#", iconify: "lucide:palette", height: 96, src: "./plugins/color.js" },
+  { id: "dev", trigger: ";;", title: "Dev tools", icon: ">", iconify: "lucide:terminal", height: 96, src: "./plugins/dev.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");

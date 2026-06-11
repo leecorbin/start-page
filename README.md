@@ -104,9 +104,10 @@ backend, no Google.
 - 🧩 **Plugins** — the omnibox can slide open into lazy-loaded mini-apps. Type a
   trigger and the box expands (spinner while the module fetches, fades in when
   ready); the plugin's own hints replace the standard ones, and `esc` always
-  returns to the normal omnibox — or **click the plugin chip** (it shows a `×`)
-  to leave without the keyboard; if the plugins row is shown, its launcher lights
-  up and a second click closes it. `⌘/` inside a plugin opens **its own help page**,
+  returns to the normal omnibox — or use the **× on the right of the box**: it
+  clears your text first, then closes the plugin (one click when the box is already
+  empty). If the plugins row is shown, the active launcher lights up and a second
+  click closes it too. `⌘/` inside a plugin opens **its own help page**,
   and each plugin can be toggled on/off in Settings → Shortcuts. Plugins live in
   `plugins/*.js` and are only downloaded on first use, so the core page stays
   instant. **Plugins load via dynamic `import()`, which browsers block from

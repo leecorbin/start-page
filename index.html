@@ -1571,8 +1571,9 @@ $("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.t
 // (Reorder/delete rebuild the editor and detach the clicked node, which would
 // otherwise read as an outside click and dismiss the panel.)
 panel.addEventListener("click", (e) => e.stopPropagation());
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("open"); });
-document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) panel.classList.remove("open"); });
+function closePanel() { panel.classList.remove("open"); closeTune(); }   // dismissing the panel also drops the look popover
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
+document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) closePanel(); });
 document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });
 
 /* ============================ boot ============================ */

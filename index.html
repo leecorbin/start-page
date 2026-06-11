@@ -83,6 +83,11 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .field:focus-within { background: var(--field-bg-focus); }   /* search is the default — no accent border; modes (below) colour it */
+  .omni-clear { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin-left: 2px; padding: 0; background: none; border: none; color: var(--fg); opacity: 0.42; cursor: pointer; border-radius: 8px; transition: opacity 0.15s ease, background 0.15s ease; }
+  .omni-clear:hover { opacity: 0.95; background: rgba(255,255,255,0.12); }
+  .omni-clear svg { width: 15px; height: 15px; }
+  .omni-clear[hidden] { display: none; }
+  body.lc-light .omni-clear { color: #15181f; }
   .plugin-btns { display: flex; align-items: center; gap: 2px; flex: none; margin-left: 4px; }
   .plugin-btns:empty { margin-left: 0; }
   .plugin-btn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; background: none; border: none; color: var(--fg); opacity: 0.5; cursor: pointer; border-radius: 8px; transition: opacity 0.15s ease, background 0.15s ease; }
@@ -333,6 +338,9 @@
         <span id="plugin-chip" class="bang-chip"></span>
         <input id="q" type="text" aria-label="Search or enter address" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <span id="plugin-btns" class="plugin-btns"></span>
+        <button type="button" id="omni-clear" class="omni-clear" title="Clear" aria-label="Clear" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
         <div id="suggest" class="suggest" hidden></div>
       </div>
       <div id="plugin-panel"><div class="pp-card"><div class="pp-spin"></div><div class="pp-content"></div></div></div>
@@ -727,7 +735,15 @@ function updateMode() {
   const isUrl = t.startsWith("/") || (S.smartUrl && !!t && looksLikeUrl(t));
   field.classList.toggle("mode-url", isUrl);
 }
+function updateClear() { const b = $("omni-clear"); if (b) b.hidden = !input.value; }   // a clear × appears only when the box has text
+$("omni-clear").onclick = (e) => {
+  e.preventDefault(); e.stopPropagation();
+  input.value = "";
+  input.dispatchEvent(new Event("input", { bubbles: true }));   // let the active plugin / search react, and hide the ×
+  input.focus({ preventScroll: true });
+};
 input.addEventListener("input", (e) => {
+  updateClear();
   if (activePlugin) { if (activePlugin.mod && activePlugin.mod.onInput) activePlugin.mod.onInput(input.value); return; }
   if (!activeBang) {
     for (const def of PLUGINS) if (!(S.disabledPlugins || []).includes(def.id) && input.value.startsWith(def.trigger)) { openPlugin(def, input.value.slice(def.trigger.length)); return; }
@@ -908,7 +924,7 @@ async function openPlugin(def, initial) {
   chip.appendChild(document.createTextNode(def.title));
   field.classList.remove("mode-url");
   field.classList.add("mode-plugin");
-  input.value = (initial || "").trim();
+  input.value = (initial || "").trim(); updateClear();
   if (savedHintsHTML == null) savedHintsHTML = $("hints").innerHTML;
   setPluginHints([["", "loading…"]]);
   pluginPanel.classList.add("loading", "open");
@@ -918,7 +934,7 @@ async function openPlugin(def, initial) {
     if (!activePlugin || activePlugin.gen !== gen) return;   // closed while loading
     activePlugin.mod = mod;
     const api = {
-      setInput: (v) => { input.value = v; },
+      setInput: (v) => { input.value = v; updateClear(); },
       getInput: () => input.value,
       setHeight: (px) => { pluginPanel.style.height = px + "px"; },
       close: closePlugin,
@@ -953,7 +969,7 @@ function closePlugin() {
   field.classList.remove("mode-plugin");
   if (savedHintsHTML != null) $("hints").innerHTML = savedHintsHTML;
   input.value = "";
-  updateMode();
+  updateMode(); updateClear();
   input.focus({ preventScroll: true });
 }
 

@@ -6,7 +6,7 @@
    Pauses when hidden, honours prefers-reduced-motion. Part of start-page (MIT). */
 
 const FKEY = "startpage:wp-fishtank";
-const DEFAULTS = { scene: "tank", tankTheme: "purple", density: "some", liveliness: "calm", text: "auto" };
+const DEFAULTS = { scene: "tank", tankTheme: "purple", density: "some", liveliness: "calm", text: "auto", aware: "on" };
 let SET = (() => { try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem(FKEY)) || {}); } catch { return { ...DEFAULTS }; } })();
 function persist() { try { localStorage.setItem(FKEY, JSON.stringify(SET)); } catch {} }
 
@@ -54,6 +54,8 @@ const PERCHES = [{ x: 382, y: 440, t: 0 }, { x: 232, y: 612, t: 0 }, { x: 772, y
 let api = null, layer = null, canvas = null, ctx = null, raf = 0, running = false, last = 0, t = 0;
 let fish = [], creatures = [], monkeys = [], insects = [], plants = [], bubbles = [], rays = [], motes = [], caustics = [], scenery = null;
 let COVER = { dpr: 1, s: 1, ox: 0, oy: 0 }, G = {}, P = new Map();
+let boxes = [], clockBox = null, obsAcc = 0, nibbleNext = rnd0(16, 36), nibbler = null;   // elemental awareness
+function rnd0(a, b) { return a + Math.random() * (b - a); }
 
 const scn = () => { const b = SCENES[SET.scene] || SCENES.tank; return b.themed ? { ...b, ...TANK_THEMES[SET.tankTheme] || TANK_THEMES.purple } : b; };
 const live = () => LIVE[SET.liveliness] || LIVE.calm;
@@ -137,7 +139,7 @@ function makeJungle() {
   for (let i = 0; i < nb; i++) { const tr = TREES[Math.random() * TREES.length | 0]; insects.push({ x: tr.x + rnd(-tr.w * 0.3, tr.w * 0.3), y: rnd(VH - 60, VH - 200), speed: rnd(20, 40), phase: rnd(0, TAU) }); }
 }
 function buildScene() {
-  const s = scn(); buildGrads();
+  const s = scn(); buildGrads(); nibbler = null;
   rays = []; for (let i = 0; i < (s.rayN || 5); i++) rays.push({ x: rnd(0.06, 0.94) * VW, w: rnd(s.jungle ? 50 : 60, s.jungle ? 130 : 150), sk: rnd(-10, 10), phase: rnd(0, TAU), freq: TAU / rnd(9, 16), top: s.jungle ? 120 : 0 });
   if (s.jungle) {
     motes = []; for (let i = 0; i < 14; i++) motes.push({ x: rnd(0, VW), y: rnd(120, VH - 120), r: rnd(2, 4), phase: rnd(0, TAU), freq: TAU / rnd(3, 7), g: G.pollen });
@@ -161,6 +163,41 @@ function buildScene() {
   }
 }
 
+/* ---------- elemental awareness (fish mind the UI) ---------- */
+function toDesign(r) { return { x: (r.x - COVER.ox) / COVER.s, y: (r.y - COVER.oy) / COVER.s, w: r.w / COVER.s, h: r.h / COVER.s }; }   // viewport px → design space
+function refreshObstacles() {
+  boxes = []; clockBox = null;
+  if (SET.aware !== "on" || !api || !api.obstacles || scn().jungle) return;
+  for (const o of api.obstacles()) { const d = toDesign(o); if (o.tag === "box") boxes.push(d); else if (o.tag === "clock" && !clockBox) clockBox = d; }
+}
+function applyAvoid(f, dt) {                                                         // steer a fish over/under the omnibox
+  let box = null; for (const b of boxes) if (f.x > b.x - 70 && f.x < b.x + b.w + 70) { box = b; break; }
+  if (box) {
+    if (f.avoidY == null && f.baseY > box.y - 52 && f.baseY < box.y + box.h + 52) f.avoidY = f.baseY < box.y + box.h / 2 ? box.y - 52 : box.y + box.h + 52;
+    if (f.avoidY != null) { f.baseY += Math.sign(f.avoidY - f.baseY) * Math.min(Math.abs(f.avoidY - f.baseY), 150 * dt); return; }
+  } else f.avoidY = null;
+  f.baseY += Math.sin(t * 0.15 + f.phase) * 6 * dt;
+}
+function nibbleStep(f, dt) {                                                         // a fish drifts up to the clock and pecks at it
+  const cx = clockBox.x + clockBox.w / 2, cy = clockBox.y + clockBox.h, n = f.nib;
+  if (n.ph === 0) {
+    const ty = cy + 32; f.dir = cx > f.x ? 1 : -1;
+    f.x += Math.sign(cx - f.x) * Math.min(Math.abs(cx - f.x), f.speed * 1.5 * dt);
+    f.baseY += Math.sign(ty - f.baseY) * Math.min(Math.abs(ty - f.baseY), f.speed * 1.5 * dt);
+    f.y = f.baseY; f.tilt = -0.12 * f.dir;
+    if (Math.abs(cx - f.x) < 28 && Math.abs(ty - f.baseY) < 28) { n.ph = 1; n.timer = rnd(2.2, 4); }
+  } else {
+    n.timer -= dt; f.dir = cx > f.x ? 1 : -1;
+    f.y = cy + 28 - Math.max(0, Math.sin(t * 7)) * 22; f.tilt = -0.32;              // quick darts up at the clock
+    if (n.timer <= 0) { f.nib = null; nibbler = null; f.baseY = f.y; }
+  }
+}
+function scheduleNibble(dt) {
+  if (SET.aware !== "on" || scn().jungle || !clockBox || nibbler || !fish.length) return;
+  nibbleNext -= dt;
+  if (nibbleNext <= 0) { nibbler = fish[Math.random() * fish.length | 0]; if (nibbler) nibbler.nib = { ph: 0, timer: 0 }; nibbleNext = rnd(16, 38); }
+}
+
 /* ---------- steering (positions only) ---------- */
 function step(dt) {
   if (scn().jungle) {
@@ -172,7 +209,13 @@ function step(dt) {
     return;
   }
   for (const f of fish) {
-    if (dt) { f.x += f.dir * f.speed * dt; if (f.x > VW + 80 && f.dir > 0) f.dir = -1; else if (f.x < -80 && f.dir < 0) f.dir = 1; f.baseY += Math.sin(t * 0.15 + f.phase) * 6 * dt; f.baseY = Math.max(90, Math.min(VH - 120, f.baseY)); }
+    if (f.nib && clockBox) { nibbleStep(f, dt); continue; }                          // off nibbling the clock
+    f.nib = null;
+    if (dt) {
+      f.x += f.dir * f.speed * dt; if (f.x > VW + 80 && f.dir > 0) f.dir = -1; else if (f.x < -80 && f.dir < 0) f.dir = 1;
+      if (SET.aware === "on" && boxes.length) applyAvoid(f, dt); else { f.avoidY = null; f.baseY += Math.sin(t * 0.15 + f.phase) * 6 * dt; }
+      f.baseY = Math.max(90, Math.min(VH - 120, f.baseY));
+    }
     f.y = f.baseY + Math.cos(t * f.bobFreq + f.phase) * f.bobAmp; f.tilt = -Math.sin(t * f.bobFreq + f.phase) * 0.1 * f.dir;
   }
   for (const c of creatures) {
@@ -309,12 +352,17 @@ function fit() {
   canvas.width = Math.max(1, Math.round(w * dpr)); canvas.height = Math.max(1, Math.round(h * dpr));
   COVER = { dpr, s: Math.max(w / VW, h / VH), ox: (w - VW * Math.max(w / VW, h / VH)) / 2, oy: (h - VH * Math.max(w / VW, h / VH)) / 2 };
 }
-function frame(ts) { if (!running) return; const dt = Math.min(0.05, (ts - (last || ts)) / 1000); last = ts; t += dt; step(dt); drawFrame(); raf = requestAnimationFrame(frame); }
+function frame(ts) {
+  if (!running) return;
+  const dt = Math.min(0.05, (ts - (last || ts)) / 1000); last = ts; t += dt;
+  if (SET.aware === "on" && !scn().jungle) { obsAcc += dt; if (obsAcc > 0.4) { obsAcc = 0; refreshObstacles(); } scheduleNibble(dt); }   // the box can move (plugins, typing)
+  step(dt); drawFrame(); raf = requestAnimationFrame(frame);
+}
 function start() { if (running) return; step(0); drawFrame(); if (api && api.reducedMotion()) return; running = true; last = 0; raf = requestAnimationFrame(frame); }   // paint one frame synchronously so there's content before rAF ticks
 function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
 function onVis() { if (document.hidden) stop(); else start(); }
-function onResize() { fit(); drawFrame(); }
-function rebuild() { reportContrast(); buildScene(); fit(); drawFrame(); }
+function onResize() { fit(); refreshObstacles(); drawFrame(); }
+function rebuild() { reportContrast(); buildScene(); fit(); refreshObstacles(); drawFrame(); }
 
 /* ---------- settings ---------- */
 const PSCSS = `
@@ -333,13 +381,15 @@ function settings(root, hostApi) {
   if (!document.getElementById("ftp-scss")) { const s = document.createElement("style"); s.id = "ftp-scss"; s.textContent = PSCSS; document.head.appendChild(s); }
   const seg = (key, map) => Object.entries(map).map(([id, v]) => `<button type="button" data-${key}="${id}" class="${SET[key] === id ? "on" : ""}">${v.name || v}</button>`).join("");
   const themeRow = SET.scene === "tank" ? `<div class="ftp-lab">Colour</div><div class="ftp-sws">${Object.entries(TANK_THEMES).map(([id, th]) => `<button type="button" class="ftp-sw${SET.tankTheme === id ? " on" : ""}" data-theme="${id}" title="${th.name}" style="background:linear-gradient(135deg, ${th.water[0]}, ${th.water[2]})"></button>`).join("")}</div>` : "";
+  const awareRow = SET.scene !== "jungle" ? `<div class="ftp-lab">Aware <span style="text-transform:none;letter-spacing:0;opacity:0.7">· fish mind the box &amp; nibble the clock</span></div><div class="ftp-seg">${seg("aware", { off: "Off", on: "On" })}</div>` : "";
   root.innerHTML = `<div class="ftp-lab">Scene</div><div class="ftp-seg">${seg("scene", SCENES)}</div>${themeRow}
     <div class="ftp-lab">${SET.scene === "jungle" ? "Monkeys" : "Fish"}</div><div class="ftp-seg">${seg("density", { few: "Few", some: "Some", many: "Many" })}</div>
-    <div class="ftp-lab">Liveliness</div><div class="ftp-seg">${seg("liveliness", { calm: "Calm", lively: "Lively", bold: "Bold" })}</div>
+    <div class="ftp-lab">Liveliness</div><div class="ftp-seg">${seg("liveliness", { calm: "Calm", lively: "Lively", bold: "Bold" })}</div>${awareRow}
     <div class="ftp-lab">Text</div><div class="ftp-seg">${seg("text", { auto: "Auto", light: "Light", dark: "Dark" })}</div>`
     + (api && api.reducedMotion() ? `<div class="ftp-note">Your system has “reduce motion” on, so the scene stays still.</div>` : ``);
   root.onclick = (e) => {
-    const a = e.target.closest("[data-scene],[data-theme],[data-density],[data-liveliness],[data-text]"); if (!a) return;
+    const a = e.target.closest("[data-scene],[data-theme],[data-density],[data-liveliness],[data-text],[data-aware]"); if (!a) return;
+    if (a.dataset.aware != null) { SET.aware = a.dataset.aware; persist(); if (SET.aware === "on") refreshObstacles(); else { fish.forEach((f) => { f.avoidY = null; f.nib = null; }); nibbler = null; boxes = []; clockBox = null; } return settings(root, api); }   // no rebuild — keep the fish where they are
     if (a.dataset.scene != null) SET.scene = a.dataset.scene;
     else if (a.dataset.theme != null) SET.tankTheme = a.dataset.theme;
     else if (a.dataset.density != null) SET.density = a.dataset.density;
@@ -357,7 +407,7 @@ export default {
     canvas = document.createElement("canvas");
     canvas.style.cssText = "position:absolute; inset:0; width:100%; height:100%; display:block;";
     layer.appendChild(canvas); ctx = canvas.getContext("2d");
-    fit(); reportContrast(); buildScene(); start();
+    fit(); reportContrast(); buildScene(); refreshObstacles(); start();
     window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", onVis);
   },
@@ -368,6 +418,6 @@ export default {
     document.removeEventListener("visibilitychange", onVis);
     const p = document.getElementById("ftp-scss"); if (p) p.remove();
     if (canvas) canvas.remove();
-    api = layer = canvas = ctx = null; fish = creatures = monkeys = insects = plants = bubbles = rays = motes = caustics = []; scenery = null; t = 0;
+    api = layer = canvas = ctx = null; fish = creatures = monkeys = insects = plants = bubbles = rays = motes = caustics = boxes = []; scenery = clockBox = nibbler = null; t = 0;
   },
 };

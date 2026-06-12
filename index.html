@@ -1258,7 +1258,7 @@ const wallpaperApi = {
   weather: () => { const c = readLS(K.wx); return c && c.data ? { code: c.data.weather_code, temp: c.data.temperature_2m, isDay: !!c.data.is_day } : null; },
   setContrast: (isLight) => { ["lc-light", "bl-light", "br-light"].forEach((c) => document.body.classList.toggle(c, !!isLight)); },   // keep text legible over the wallpaper
   // rects of the key UI (omnibox, clock, weather…) so a wallpaper could be "aware" of them — e.g. fish that swim around the box
-  obstacles: () => [".field", "#clock", "#analog", "#weather", "#greeting"].map((s) => { const el = document.querySelector(s); if (!el || el.hidden || el.offsetParent === null) return null; const r = el.getBoundingClientRect(); return r.width ? { x: r.x, y: r.y, w: r.width, h: r.height } : null; }).filter(Boolean),
+  obstacles: () => [[".field", "box"], ["#clock", "clock"], ["#analog", "clock"], ["#weather", "weather"], ["#greeting", "greeting"]].map(([s, tag]) => { const el = document.querySelector(s); if (!el || el.hidden || el.offsetParent === null) return null; const r = el.getBoundingClientRect(); return r.width ? { tag, x: r.x, y: r.y, w: r.width, h: r.height } : null; }).filter(Boolean),
 };
 async function mountWallpaper(id) {
   const def = WALLPAPERS.find((w) => w.id === id);

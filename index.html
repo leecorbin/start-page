@@ -1407,9 +1407,10 @@ function beginPick(onPick, btn) {                                  // generic: s
 }
 function endPick() { picking = false; pickCb = null; document.body.classList.remove("eyedropping"); if (pickBtn) pickBtn.classList.remove("active"); pickBtn = null; }
 function samplePixel(cx, cy) {
-  const iw = lastImg.naturalWidth, ih = lastImg.naturalHeight, vw = innerWidth, vh = innerHeight;
-  const scale = Math.max(vw / iw, vh / ih);                        // background-size: cover, centred
-  let ix = (cx - (vw - iw * scale) / 2) / scale, iy = (cy - (vh - ih * scale) / 2) / scale;
+  const iw = lastImg.naturalWidth, ih = lastImg.naturalHeight;
+  const r = bgEl.getBoundingClientRect();                          // #bg's REAL on-screen box — already includes its inset + scale transform
+  const scale = Math.max(r.width / iw, r.height / ih);             // background-size: cover, centred within #bg
+  let ix = (cx - r.left - (r.width - iw * scale) / 2) / scale, iy = (cy - r.top - (r.height - ih * scale) / 2) / scale;
   ix = Math.max(0, Math.min(iw - 1, ix)); iy = Math.max(0, Math.min(ih - 1, iy));
   const c = document.createElement("canvas"); c.width = c.height = 1;
   const ctx = c.getContext("2d", { willReadFrequently: true });

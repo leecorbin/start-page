@@ -45,6 +45,7 @@ const SCENES = {
   tank:   { name: "Fish tank", themed: true, species: ["round", "slim", "angel"], grads: [0, 1, 2, 3, 4, 5, 6, 7], creatures: [], plantN: 10, plantStyle: "lush", rayN: 5, rayDim: 1, biolum: 0, bg: 1 },
   lagoon: { name: "Lagoon", water: ["#1ba0d6", "#0e63a0", "#06335e"], ray: "#e2f4ff", plant: ["#3ec06a", "#2c8050", "#b8543a"], species: ["round", "slim", "angel"], grads: [0, 1, 2, 3, 4, 5, 7], creatures: ["crab", "crab"], plantN: 13, plantStyle: "lush", rayN: 6, rayDim: 1.15, biolum: 0, bg: 1.08 },
   deep:   { name: "Deep", water: ["#0a2342", "#05132a", "#01060f"], ray: "#3f5e9a", plant: ["#1f5a52", "#143e3a", "#3a2a5e"], species: ["angler", "slim", "angel"], grads: [8, 9, 10, 11, 12], creatures: ["jelly", "jelly", "jelly"], plantN: 4, plantStyle: "sparse", rayN: 3, rayDim: 0.5, biolum: 18, bg: 0.62 },
+  jungle: { name: "Jungle", jungle: true, water: ["#cfe08a", "#6fa048", "#172312"], ray: "#fff2c8", plant: ["#3fa050", "#2c7a3a", "#8a5a2e"], species: [], grads: [], creatures: [], plantN: 0, plantStyle: "lush", rayN: 5, rayDim: 1, biolum: 0, bg: 0.95 },
 };
 const DENSITY = { few: 5, some: 9, many: 14 };
 const LIVE = { calm: { spd: 16, tail: 1.7 }, lively: { spd: 30, tail: 1.05 }, bold: { spd: 48, tail: 0.62 } };
@@ -86,6 +87,15 @@ function defs() {
   g += `<radialGradient id="ft-lure" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fffbe0" stop-opacity="1"/><stop offset="0.4" stop-color="#ffe79a" stop-opacity="0.85"/><stop offset="1" stop-color="#ffd24c" stop-opacity="0"/></radialGradient>`;
   s.plant.forEach((c, i) => { const d = hexRgb(c); g += `<linearGradient id="ft-plant${i}" x1="0" y1="1" x2="0.2" y2="0"><stop offset="0" stop-color="rgb(${d[0] * 0.55 | 0},${d[1] * 0.55 | 0},${d[2] * 0.55 | 0})"/><stop offset="1" stop-color="${c}"/></linearGradient>`; });
   GRADS.forEach((cols, i) => { g += `<linearGradient id="ft-fg${i}" x1="0" y1="0.1" x2="1" y2="0.9"><stop offset="0" stop-color="${cols[0]}"/><stop offset="0.5" stop-color="${cols[1]}"/><stop offset="1" stop-color="${cols[2]}"/></linearGradient>`; });
+  // jungle
+  g += `<linearGradient id="ft-trunk" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a2616"/><stop offset="0.5" stop-color="#6b4a2a"/><stop offset="1" stop-color="#2a1a0e"/></linearGradient>`;
+  g += `<radialGradient id="ft-canopy" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#5fb84e"/><stop offset="0.6" stop-color="#2f8038"/><stop offset="1" stop-color="#1c4a22"/></radialGradient>`;
+  g += `<radialGradient id="ft-canopy2" cx="0.4" cy="0.35" r="0.7"><stop offset="0" stop-color="#7ec85a"/><stop offset="0.6" stop-color="#418a3a"/><stop offset="1" stop-color="#235a26"/></radialGradient>`;
+  g += `<linearGradient id="ft-leaf" x1="0" y1="1" x2="0.3" y2="0"><stop offset="0" stop-color="#1f6e2e"/><stop offset="1" stop-color="#4cb058"/></linearGradient>`;
+  g += `<linearGradient id="ft-banana" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe14c"/><stop offset="1" stop-color="#e0a02a"/></linearGradient>`;
+  g += `<radialGradient id="ft-pollen" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff6d8" stop-opacity="0.95"/><stop offset="0.5" stop-color="#ffe79a" stop-opacity="0.5"/><stop offset="1" stop-color="#ffe79a" stop-opacity="0"/></radialGradient>`;
+  g += `<linearGradient id="ft-floor" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c3016" stop-opacity="0"/><stop offset="1" stop-color="#0e1c0a" stop-opacity="0.9"/></linearGradient>`;
+  [["#7a5230", "#4a3119"], ["#8a8276", "#5a5048"], ["#a87a3e", "#6e4e22"], ["#5a3e26", "#33220f"]].forEach((c, i) => { g += `<linearGradient id="ft-mk${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset="1" stop-color="${c[1]}"/></linearGradient>`; });
   g += `<filter id="ft-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2"/></filter>`;
   g += `<filter id="ft-caustic"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.022" numOctaves="1" seed="7" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 -0.62"/></filter>`;
   return `<defs>${g}</defs>`;
@@ -190,9 +200,130 @@ function makeCreatures() {
   });
 }
 
+/* ========================= jungle ========================= */
+const TREES = [{ x: 300, w: 78 }, { x: 830, w: 96 }, { x: 1330, w: 80 }];
+const PERCHES = [{ x: 382, y: 440, t: 0 }, { x: 232, y: 612, t: 0 }, { x: 772, y: 372, t: 1 }, { x: 922, y: 556, t: 1 }, { x: 1262, y: 470, t: 2 }, { x: 1404, y: 636, t: 2 }];
+const FAMILY = [
+  { fur: 3, scale: 1.6, acc: "plain", banana: true, canLeap: true, belly: "#cda878", face: "#e6cd9e" },    // dad
+  { fur: 0, scale: 1.42, acc: "bow", banana: false, canLeap: true, belly: "#d8b88a", face: "#ecd2a6" },    // mum
+  { fur: 2, scale: 1.18, acc: "glasses", banana: true, canLeap: true, belly: "#e2c690", face: "#f1daab" }, // kid
+  { fur: 1, scale: 0.92, acc: "flower", banana: false, canLeap: false, belly: "#d3c8b6", face: "#e8dfcd" },// baby
+];
+const MONK = { few: 2, some: 3, many: 4 };
+let monkeys = [], insects = [];
+
+function tree(tr) {
+  const x = tr.x, w = tr.w, top = 150;
+  let s = `<path d="M${x - w / 2} ${VH} C ${x - w * 0.42} 560, ${x - w * 0.3} 320, ${x - w * 0.18} ${top} L ${x + w * 0.18} ${top} C ${x + w * 0.3} 320, ${x + w * 0.42} 560, ${x + w / 2} ${VH} Z" fill="url(#ft-trunk)"/>`;
+  s += `<path d="M${x - 4} ${VH} C ${x - 2} 600, ${x - 8} 360, ${x - 5} ${top + 40}" stroke="#2a1a0e" stroke-width="3" fill="none" opacity="0.5"/>`;   // bark
+  PERCHES.filter((p) => p.t === TREES.indexOf(tr)).forEach((p) => {
+    const dir = p.x > x ? 1 : -1;
+    s += `<path d="M${x} ${p.y + 14} Q ${(x + p.x) / 2} ${p.y - 16} ${p.x + dir * 14} ${p.y + 2}" stroke="url(#ft-trunk)" stroke-width="16" fill="none" stroke-linecap="round"/>`;
+    s += `<ellipse cx="${p.x + dir * 30}" cy="${p.y - 8}" rx="46" ry="30" fill="url(#ft-canopy${Math.random() < 0.5 ? "" : "2"})" opacity="0.96"/>`;
+  });
+  return s;
+}
+function monkeyMarkup(m) {
+  const fur = `url(#ft-mk${m.fur})`;
+  let acc = "";
+  if (m.acc === "bow") acc = `<g transform="translate(-13,-58)"><path d="M0 0 C -4 -7 -15 -7 -15 0 C -15 7 -4 7 0 0 Z" fill="#ff6f9e"/><path d="M0 0 C 4 -7 15 -7 15 0 C 15 7 4 7 0 0 Z" fill="#ff6f9e"/><circle r="3.6" fill="#e0457e"/></g>`;
+  else if (m.acc === "glasses") acc = `<g transform="translate(0,-47)" stroke="#241a12" stroke-width="1.8" fill="rgba(170,215,255,0.22)"><circle cx="-5" cy="0" r="6"/><circle cx="5" cy="0" r="6"/><path d="M-0.6 0 h1.2"/></g>`;
+  else if (m.acc === "flower") acc = `<g transform="translate(-13,-57)" fill="#ffcf4c"><circle cx="-3.5" cy="0" r="2.6"/><circle cx="3.5" cy="0" r="2.6"/><circle cx="0" cy="-3.5" r="2.6"/><circle cx="0" cy="3.5" r="2.6"/><circle r="2.2" fill="#e0682a"/></g>`;
+  const banana = m.banana ? `<g class="ft-mkeat" transform="translate(12,-38)"><path d="M0 0 Q 14 -3 17 -16 Q 13 0 -1 5 Z" fill="url(#ft-banana)" stroke="#b07f1e" stroke-width="0.7"/></g>` : "";
+  return `<g class="ft-monkey" data-i="${m.i}"><g class="ft-mkidle">
+    <path d="M9 -12 C 34 -8 33 -36 21 -42 C 29 -34 25 -18 7 -18 Z" fill="${fur}"/>
+    <ellipse cx="-11" cy="-7" rx="7" ry="9" fill="${fur}"/><ellipse cx="11" cy="-7" rx="7" ry="9" fill="${fur}"/>
+    <path d="M-15 -11 C -19 -42 19 -42 15 -11 C 8 -3 -8 -3 -15 -11 Z" fill="${fur}"/>
+    <ellipse cx="0" cy="-19" rx="8.5" ry="12" fill="${m.belly}"/>
+    <path class="ft-mkarm" d="M-13 -33 C -24 -29 -25 -15 -16 -11" stroke="${fur}" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <path d="M13 -33 C 22 -31 25 -23 19 -16" stroke="${fur}" stroke-width="7" fill="none" stroke-linecap="round"/>
+    <circle cx="0" cy="-47" r="15" fill="${fur}"/>
+    <circle cx="-15" cy="-48" r="6" fill="${fur}"/><circle cx="15" cy="-48" r="6" fill="${fur}"/>
+    <circle cx="-15" cy="-48" r="3" fill="${m.belly}"/><circle cx="15" cy="-48" r="3" fill="${m.belly}"/>
+    <path d="M0 -56 C -12 -56 -12 -38 0 -37 C 12 -38 12 -56 0 -56 Z" fill="${m.face}"/>
+    <ellipse cx="0" cy="-43" rx="7" ry="5.2" fill="${m.face}"/>
+    <circle cx="-5" cy="-48" r="2.3" fill="#190f08"/><circle cx="5" cy="-48" r="2.3" fill="#190f08"/>
+    <circle cx="-4.2" cy="-48.8" r="0.7" fill="#fff"/><circle cx="5.8" cy="-48.8" r="0.7" fill="#fff"/>
+    <ellipse cx="0" cy="-44" rx="1.6" ry="1" fill="#3a2414"/>
+    <path d="M-3.5 -41 Q0 -38.5 3.5 -41" stroke="#5a3a1e" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+    ${banana}${acc}
+  </g></g>`;
+}
+function bugMarkup(b) {
+  return `<g class="ft-bug" data-i="${b.i}"><g class="ft-buglegs"><path d="M-4 -3 l-6 -3 M-4 0 l-7 0 M-4 3 l-6 3 M4 -3 l6 -3 M4 0 l7 0 M4 3 l6 3" stroke="#1a1208" stroke-width="1.4"/></g><ellipse cx="0" cy="0" rx="5" ry="8" fill="#241810"/><ellipse cx="0" cy="-3" rx="3.5" ry="4" fill="#3a2a16"/><path d="M-2 -8 l-2 -4 M2 -8 l2 -4" stroke="#1a1208" stroke-width="1"/></g>`;
+}
+function leaf(x, y, sc, rot, flip) {
+  return `<g style="transform:translate(${x}px,${y}px)"><g class="ft-leaf2" style="animation-duration:${rnd(6, 10).toFixed(1)}s; animation-delay:${rnd(-5, 0).toFixed(1)}s"><g transform="scale(${(flip ? -sc : sc).toFixed(2)} ${sc}) rotate(${rot})"><path d="M0 0 C -40 -20 -60 -90 -10 -150 C 40 -90 40 -20 0 0 Z" fill="url(#ft-leaf)"/><path d="M-8 -8 C -18 -50 -14 -100 -10 -140" stroke="#1c5a26" stroke-width="2.5" fill="none" opacity="0.5"/><path d="M-10 -50 l-16 -10 M-11 -80 l-14 -14 M-9 -40 l14 -6 M-10 -70 l13 -10" stroke="#1c5a26" stroke-width="1.6" opacity="0.4"/></g></g></g>`;
+}
+
+function buildJungle(s) {
+  let html = defs();
+  html += `<rect width="${VW}" height="${VH}" fill="url(#ft-water)"/>`;
+  html += `<rect width="${VW}" height="${VH * 0.42}" fill="url(#ft-glow)"/>`;
+  // light shafts through the canopy (warm)
+  let rays = "";
+  for (let i = 0; i < s.rayN; i++) { const x = rnd(0.08, 0.92) * VW, w = rnd(50, 130), sk = rnd(-8, 8); rays += `<g class="ft-ray" style="animation-duration:${rnd(9, 16).toFixed(1)}s; animation-delay:${rnd(-8, 0).toFixed(1)}s"><polygon points="${x},120 ${x + w},120 ${x + w + sk + 90},${VH} ${x + sk - 30},${VH}" fill="url(#ft-ray)"/></g>`; }
+  html += `<g style="mix-blend-mode:screen">${rays}</g>`;
+  // far hazy foliage (static blur)
+  let far = ""; for (let i = 0; i < 9; i++) far += `<ellipse cx="${rnd(0, VW) | 0}" cy="${rnd(-10, 220) | 0}" rx="${rnd(110, 200) | 0}" ry="${rnd(80, 130) | 0}" fill="url(#ft-canopy)"/>`;
+  html += `<g style="filter:url(#ft-soft);opacity:0.55">${far}</g>`;
+  // trees + branches
+  html += `<g>${TREES.map(tree).join("")}</g>`;
+  // hanging vines
+  let vines = ""; for (let i = 0; i < 7; i++) { const x = rnd(0.05, 0.95) * VW, h = rnd(120, 340); vines += `<g class="ft-vine" style="animation-duration:${rnd(7, 11).toFixed(1)}s; animation-delay:${rnd(-6, 0).toFixed(1)}s; transform-origin:${x}px 60px"><path d="M${x} 60 q ${rnd(-14, 14)} ${h * 0.5} ${rnd(-8, 8)} ${h}" stroke="#2c6e34" stroke-width="2.5" fill="none" opacity="0.55"/></g>`; }
+  html += vines;
+  // pollen motes drifting in the light
+  let motes = ""; for (let i = 0; i < 14; i++) motes += `<g class="ft-mote" style="transform:translate(${rnd(0, VW) | 0}px,${rnd(120, VH - 120) | 0}px); animation-duration:${rnd(3, 7).toFixed(1)}s; animation-delay:${rnd(-7, 0).toFixed(1)}s"><circle r="${rnd(2, 4).toFixed(1)}" fill="url(#ft-pollen)"/></g>`;
+  html += `<g>${motes}</g>`;
+  html += `<g class="ft-monkeylayer"></g><g class="ft-insectlayer"></g>`;
+  // canopy ceiling across the top
+  let cano = ""; for (let i = 0; i < 11; i++) { const cx = (i / 10) * VW + rnd(-70, 70), cy = rnd(-30, 150); cano += `<ellipse cx="${cx | 0}" cy="${cy | 0}" rx="${rnd(95, 175) | 0}" ry="${rnd(75, 115) | 0}" fill="url(#ft-canopy${Math.random() < 0.5 ? "" : "2"})"/>`; }
+  html += `<g>${cano}</g>`;
+  // floor ferns + ground
+  html += `<rect width="${VW}" height="170" y="${VH - 170}" fill="url(#ft-floor)"/>`;
+  let ferns = ""; for (let i = 0; i < 9; i++) ferns += plantCluster(rnd(0, VW), rnd(30, 52), rnd(150, 280), "blade", 0, i % 2 === 0);
+  html += `<g>${ferns}</g>`;
+  // foreground big leaves framing
+  html += leaf(-30, VH - 20, rnd(1.5, 1.9), rnd(-18, 6), false) + leaf(VW + 30, VH - 30, rnd(1.5, 1.9), rnd(-6, 18), true) + leaf(rnd(0.3, 0.7) * VW, VH + 20, rnd(1.1, 1.4), rnd(-10, 10), Math.random() < 0.5);
+  html += `<rect width="${VW}" height="${VH}" fill="url(#ft-vignette)" pointer-events="none"/>`;
+  svg.innerHTML = html;
+  makeJungle();
+  svg.querySelector(".ft-monkeylayer").innerHTML = monkeys.map(monkeyMarkup).join("");
+  svg.querySelector(".ft-insectlayer").innerHTML = insects.map(bugMarkup).join("");
+  monkeys.forEach((m) => { m.el = svg.querySelector(`.ft-monkey[data-i="${m.i}"]`); });
+  insects.forEach((b) => { b.el = svg.querySelector(`.ft-bug[data-i="${b.i}"]`); });
+  placeAll(0);
+}
+function makeJungle() {
+  const n = MONK[SET.density] || 3, lv = SET.liveliness;
+  const leapBase = lv === "bold" ? [4, 10] : lv === "lively" ? [8, 16] : [14, 28];
+  monkeys = FAMILY.slice(0, n).map((f, i) => ({ ...f, i, perch: i, x: PERCHES[i].x, y: PERCHES[i].y, leaping: false, next: rnd(leapBase[0], leapBase[1]), lb: leapBase }));
+  const nb = lv === "calm" ? 2 : 3;
+  insects = []; for (let i = 0; i < nb; i++) { const tr = TREES[(Math.random() * TREES.length) | 0]; insects.push({ i, x: tr.x + rnd(-tr.w * 0.3, tr.w * 0.3), y: rnd(VH - 60, VH - 200), speed: rnd(20, 40) }); }
+}
+function placeJungle(dt) {
+  for (const m of monkeys) {
+    if (m.leaping) {
+      m.lt += dt; const p = Math.min(1, m.lt / m.ldur);
+      m.x = m.fx + (m.tx - m.fx) * p;
+      m.y = m.fy + (m.ty - m.fy) * p - Math.sin(p * Math.PI) * (70 + Math.abs(m.tx - m.fx) * 0.12);
+      if (p >= 1) { m.leaping = false; m.x = m.tx; m.y = m.ty; m.perch = m.tp; m.next = rnd(m.lb[0], m.lb[1]); }
+    } else if (dt && m.canLeap) {
+      m.next -= dt;
+      if (m.next <= 0) { const opts = PERCHES.map((_, i) => i).filter((i) => i !== m.perch && !monkeys.some((o) => o !== m && o.perch === i)); if (opts.length) { const tp = opts[(Math.random() * opts.length) | 0]; Object.assign(m, { leaping: true, lt: 0, ldur: rnd(0.7, 1), fx: m.x, fy: m.y, tx: PERCHES[tp].x, ty: PERCHES[tp].y, tp }); } else m.next = rnd(3, 6); }
+    }
+    if (m.el) m.el.setAttribute("transform", `translate(${m.x.toFixed(1)} ${m.y.toFixed(1)}) scale(${m.scale})`);
+  }
+  for (const b of insects) {
+    if (dt) { b.y -= b.speed * dt; if (b.y < 130) { b.y = VH - 30; } }
+    if (b.el) b.el.setAttribute("transform", `translate(${b.x.toFixed(1)} ${b.y.toFixed(1)})`);
+  }
+}
+
 /* ---------- scene assembly ---------- */
 function buildScene() {
   const s = scene();
+  if (s.jungle) return buildJungle(s);
   let html = defs();
   html += `<rect width="${VW}" height="${VH}" fill="url(#ft-water)"/>`;
   html += `<rect width="${VW}" height="${VH * 0.5}" fill="url(#ft-glow)"/>`;
@@ -232,6 +363,7 @@ function buildScene() {
 
 /* ---------- steering ---------- */
 function placeAll(dt) {
+  if (scene().jungle) return placeJungle(dt);
   for (const f of fish) {
     if (dt) {
       f.x += f.dir * f.speed * dt;
@@ -301,7 +433,16 @@ const SCSS = `
 @keyframes ft-claw { from { transform: rotate(-4deg); } to { transform: rotate(6deg); } }
 .ft-crabb { transform-box: fill-box; transform-origin: 50% 100%; animation: ft-crabbob 0.5s ease-in-out infinite alternate; }
 @keyframes ft-crabbob { from { transform: translateY(0); } to { transform: translateY(-2px); } }
-.ft-still .ft-tail, .ft-still .ft-pec, .ft-still .ft-plant, .ft-still .ft-ray, .ft-still .ft-caustic, .ft-still .ft-brise, .ft-still .ft-bwob, .ft-still .ft-mote, .ft-still .ft-bell, .ft-still .ft-tents, .ft-still .ft-leg, .ft-still .ft-claw, .ft-still .ft-crabb, .ft-still .ft-lurebulb { animation: none; }
+.ft-mkidle { transform-box: fill-box; transform-origin: 50% 100%; animation: ft-mkidle 3.4s ease-in-out infinite; }
+@keyframes ft-mkidle { 0%,100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-2px) rotate(1.2deg); } }
+.ft-mkeat { transform-box: fill-box; transform-origin: 100% 100%; animation: ft-mkeat 2.8s ease-in-out infinite; }
+@keyframes ft-mkeat { 0%,40%,100% { transform: translate(0,0) rotate(0); } 60%,80% { transform: translate(-11px,-3px) rotate(-30deg); } }
+.ft-buglegs { animation: ft-buglegs 0.22s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 50%; }
+@keyframes ft-buglegs { from { transform: translateY(-0.6px); } to { transform: translateY(0.6px); } }
+.ft-leaf2 { transform-box: fill-box; transform-origin: 50% 100%; animation: ft-sway 8s ease-in-out infinite; }
+.ft-vine { animation: ft-vinesway 9s ease-in-out infinite; }
+@keyframes ft-vinesway { 0%,100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+.ft-still .ft-tail, .ft-still .ft-pec, .ft-still .ft-plant, .ft-still .ft-ray, .ft-still .ft-caustic, .ft-still .ft-brise, .ft-still .ft-bwob, .ft-still .ft-mote, .ft-still .ft-bell, .ft-still .ft-tents, .ft-still .ft-leg, .ft-still .ft-claw, .ft-still .ft-crabb, .ft-still .ft-lurebulb, .ft-still .ft-mkidle, .ft-still .ft-mkeat, .ft-still .ft-buglegs, .ft-still .ft-leaf2, .ft-still .ft-vine { animation: none; }
 .ft-paused * { animation-play-state: paused !important; }
 `;
 function ensureCss() { let e = document.getElementById("ft-css"); if (!e) { e = document.createElement("style"); e.id = "ft-css"; document.head.appendChild(e); } e.textContent = SCSS; }
@@ -325,7 +466,7 @@ function settings(root, hostApi) {
   const themeRow = SET.scene === "tank"
     ? `<div class="ftp-lab">Colour</div><div class="ftp-sws">${Object.entries(TANK_THEMES).map(([id, th]) => `<button type="button" class="ftp-sw${SET.tankTheme === id ? " on" : ""}" data-theme="${id}" title="${th.name}" style="background:linear-gradient(135deg, ${th.water[0]}, ${th.water[2]})"></button>`).join("")}</div>` : "";
   root.innerHTML = `<div class="ftp-lab">Scene</div><div class="ftp-seg">${seg("scene", SCENES)}</div>${themeRow}
-    <div class="ftp-lab">Fish</div><div class="ftp-seg">${seg("density", { few: "Few", some: "Some", many: "Many" })}</div>
+    <div class="ftp-lab">${SET.scene === "jungle" ? "Monkeys" : "Fish"}</div><div class="ftp-seg">${seg("density", { few: "Few", some: "Some", many: "Many" })}</div>
     <div class="ftp-lab">Liveliness</div><div class="ftp-seg">${seg("liveliness", { calm: "Calm", lively: "Lively", bold: "Bold" })}</div>
     <div class="ftp-lab">Text</div><div class="ftp-seg">${seg("text", { auto: "Auto", light: "Light", dark: "Dark" })}</div>`
     + (api && api.reducedMotion() ? `<div class="ftp-note">Your system has “reduce motion” on, so the tank stays still.</div>` : ``);
@@ -358,6 +499,6 @@ export default {
     document.removeEventListener("visibilitychange", onVis);
     ["ft-css", "ftp-scss"].forEach((id) => { const e = document.getElementById(id); if (e) e.remove(); });
     if (svg) svg.remove();
-    api = layer = svg = null; fish = []; creatures = []; t = 0;
+    api = layer = svg = null; fish = []; creatures = []; monkeys = []; insects = []; t = 0;
   },
 };

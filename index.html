@@ -255,6 +255,13 @@
   #panel textarea { width: 100%; min-height: 70px; resize: vertical; }
   #panel code { background: rgba(255,255,255,0.10); border-radius: 4px; padding: 0.05rem 0.3rem; font-size: 0.82em; }
   .minibtn { background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.85rem; padding: 0.4rem 0.55rem; cursor: pointer; }
+  .bm-link { display: inline-block; background: rgba(91,155,255,0.18); border: 1px solid rgba(91,155,255,0.45); border-radius: 7px; padding: 0.05rem 0.4rem; color: var(--fg); text-decoration: none; cursor: grab; white-space: nowrap; }
+  .bm-link:hover { background: rgba(91,155,255,0.3); }
+  .imp-list { list-style: none; margin: 0.6rem 0 1rem; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; max-height: 40vh; overflow-y: auto; }
+  .imp-list li { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.88rem; }
+  .imp-list code { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 0.05rem 0.35rem; flex: none; }
+  .imp-list .dup { color: var(--muted); font-size: 0.78rem; }
+  .imp-row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.4rem; }
   .minibtn:hover { background: rgba(255,255,255,0.18); }
   .minibtn:disabled { opacity: 0.4; cursor: not-allowed; }
   .minibtn:disabled:hover { background: rgba(255,255,255,0.10); }
@@ -485,6 +492,11 @@
         <p class="grp-note">Type the <strong>key</strong> + space in the search box (e.g. <code>imdb </code>) then your query. URL uses <code>{q}</code>. Icon optional — ⌃⌘Space for emoji/symbols.</p>
         <div id="bang-editor"></div>
         <button class="minibtn" id="bang-add" style="width:100%;margin-top:0.2rem;">+ Add search</button>
+        <div style="display:flex;gap:0.4rem;margin-top:0.45rem;">
+          <button class="minibtn" id="bang-share" style="flex:1;">Share these…</button>
+          <button class="minibtn" id="bang-import" style="flex:1;">Import…</button>
+        </div>
+        <p class="grp-note" style="margin-top:0.5rem;">Or drag <a id="bang-bookmarklet" href="#" class="bm-link" title="Drag me to your bookmarks bar" draggable="true">🔎 Add to start page</a> to your bookmarks bar — then on any site with a search, click it to add that site's search here. Sharing &amp; the bookmarklet are <strong>serverless</strong> (a link, no account); they never include your history.</p>
       </div>
       <div class="group">
         <label class="h">Frequent sites</label>
@@ -1300,8 +1312,12 @@ function openWpPop(trigger) {
   content.innerHTML = "";
   try { activeWallpaper.mod.settings(content, wallpaperApi); } catch (e) { console.error(e); }
   pop.hidden = false; positionPop(pop, trigger);
+  if (wpPopRO) wpPopRO.disconnect();                       // reposition when the wallpaper's settings re-render taller/shorter
+  wpPopRO = new ResizeObserver(() => positionPop(pop, $("wp-cfg")));
+  wpPopRO.observe(content);
 }
-function closeWpPop() { const p = $("wp-pop"); if (p) p.hidden = true; }
+let wpPopRO = null;
+function closeWpPop() { const p = $("wp-pop"); if (p) p.hidden = true; if (wpPopRO) { wpPopRO.disconnect(); wpPopRO = null; } }
 $("wp-cfg").onclick = (e) => { e.stopPropagation(); const p = $("wp-pop"); p.hidden ? openWpPop(e.currentTarget) : closeWpPop(); };
 $("wp-pop-close").onclick = closeWpPop;
 // capture phase: runs before a wallpaper's settings() re-renders the popover (which would detach e.target and look "outside")
@@ -1488,6 +1504,57 @@ function importSettings(file) {
     } catch { alert("Couldn't read that settings file."); }
   };
   reader.readAsText(file);
+}
+
+/* ============ share / import custom searches (serverless — a link, no account, no history) ============ */
+function shareEncode(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj)); let s = "";
+  bytes.forEach((b) => (s += String.fromCharCode(b)));
+  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");   // url-safe base64
+}
+function shareDecode(code) {
+  try { let b = String(code).replace(/-/g, "+").replace(/_/g, "/"); while (b.length % 4) b += "="; return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b), (c) => c.charCodeAt(0)))); } catch { return null; }
+}
+const shareLink = (obj) => location.origin + location.pathname + "#import=" + shareEncode(obj);
+const bangsPayload = () => ({ t: "ssp-search", v: 1, d: (S.bangs || []).map((b) => ({ keyword: b.keyword, name: b.name, url: b.url, icon: b.icon || "" })) });
+function cleanSearches(list) {                                     // sanitise UNTRUSTED imported searches: http(s) + {q} only (no javascript: bangs)
+  if (!Array.isArray(list)) return [];
+  return list.map((b) => ({
+    keyword: String((b && b.keyword) || "").toLowerCase().replace(/\s+/g, "").slice(0, 24),
+    name: String((b && b.name) || "").slice(0, 60),
+    url: String((b && b.url) || ""),
+    icon: (b && typeof b.icon === "string" && (/^https:\/\//.test(b.icon) || (b.icon.length <= 4 && !/[<>:]/.test(b.icon)))) ? b.icon : "",
+  })).filter((b) => b.keyword && /^https?:\/\//i.test(b.url) && b.url.includes("{q}"));
+}
+function importSearches(list) {
+  const clean = cleanSearches(list); if (!clean.length) { alert("No valid custom searches in that code."); return; }
+  const existing = new Set((S.bangs || []).map((b) => (b.keyword || "").toLowerCase()));
+  const overlay = document.createElement("div"); overlay.className = "modal";
+  const card = document.createElement("div"); card.className = "modal-card"; overlay.appendChild(card);
+  const h = document.createElement("h2"); h.textContent = "Import custom searches"; h.style.cssText = "margin:0 0 0.3rem;font-size:1.05rem;font-weight:500"; card.appendChild(h);
+  const p = document.createElement("p"); p.className = "grp-note"; p.textContent = `Add these ${clean.length} search${clean.length > 1 ? "es" : ""} to your start page? Duplicates are skipped.`; card.appendChild(p);
+  const ul = document.createElement("ul"); ul.className = "imp-list";
+  clean.forEach((b) => { const li = document.createElement("li"); const kc = document.createElement("code"); kc.textContent = b.keyword; const nm = document.createElement("span"); nm.textContent = b.name || b.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]; li.append(kc, nm); if (existing.has(b.keyword)) { const d = document.createElement("span"); d.className = "dup"; d.textContent = "· already have"; li.appendChild(d); } ul.appendChild(li); });
+  card.appendChild(ul);
+  const row = document.createElement("div"); row.className = "imp-row";
+  const cancel = document.createElement("button"); cancel.className = "minibtn"; cancel.textContent = "Cancel";
+  const add = document.createElement("button"); add.className = "minibtn"; add.textContent = "Add"; add.style.cssText = "background:var(--accent);border-color:var(--accent);color:#fff";
+  row.append(cancel, add); card.appendChild(row);
+  const close = () => overlay.remove();
+  cancel.onclick = close; overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  add.onclick = () => { S.bangs = S.bangs || []; for (const b of clean) if (!existing.has(b.keyword)) { S.bangs.push(b); existing.add(b.keyword); } save(); if ($("bang-editor")) renderBangEditor(); close(); };
+  document.body.appendChild(overlay);
+}
+function handleShareHash() {
+  const m = (location.hash || "").match(/^#(?:import|addsearch)=(.+)$/);
+  if (!m) return;
+  const obj = shareDecode(m[1]); history.replaceState(null, "", location.pathname + location.search);
+  if (obj && obj.t === "ssp-search" && Array.isArray(obj.d)) importSearches(obj.d);
+}
+function bookmarkletHref() {                                       // runs on the visited site; opens the start page with the search encoded in the hash
+  const target = location.origin + location.pathname;
+  const bm = "(function(){function E(o){return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\\+/g,'-').replace(/\\//g,'_').replace(/=+$/,'')}function go(u){var n=(document.title||'').split(/[|\\-\\u2013\\u2014:\\u00b7]/)[0].trim()||location.hostname,k=location.hostname.replace(/^www\\./,'').split('.')[0];window.open('" + target + "#import='+E({t:'ssp-search',v:1,d:[{keyword:k,name:n,url:u,icon:''}]}),'_blank')}function T(t){go(t.replace(/\\{searchTerms\\}/g,'{q}').replace(/%s/g,'{q}'))}function H(){try{var u=new URL(location.href),P=['q','query','search','s','k','term','keyword','wd','p'],i;for(i=0;i<P.length;i++)if(u.searchParams.has(P[i])){u.searchParams.set(P[i],'__SSPQ__');return T(u.toString().replace('__SSPQ__','{q}'))}var t=prompt('Paste this site\\u2019s search URL, with {q} where the query goes:',location.origin+'/search?q={q}');if(t)T(t)}catch(e){}}var o=document.querySelector('link[rel~=\\\"search\\\"][type=\\\"application/opensearchdescription+xml\\\"]');if(o&&o.href){fetch(o.href).then(function(r){return r.text()}).then(function(x){var m=x.match(/template=\\\"([^\\\"]*\\{searchTerms\\}[^\\\"]*)\\\"/i);m?T(m[1].replace(/&amp;/g,'&')):H()}).catch(H)}else H()})()";
+  return "javascript:" + bm;
 }
 
 /* ============================ weather ============================ */
@@ -1830,6 +1897,13 @@ function bindControls() {
 
   $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", icon: "" }); save(); renderLinkEditor(); };
   $("bang-add").onclick = () => { (S.bangs = S.bangs || []).push({ keyword: "", name: "", url: "", icon: "" }); save(); renderBangEditor(); };
+  $("bang-share").onclick = (e) => {
+    if (!(S.bangs || []).some((b) => b.keyword && b.url)) { alert("Add a custom search first."); return; }
+    const link = shareLink(bangsPayload()), btn = e.currentTarget, o = btn.textContent;
+    (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => { btn.textContent = "Link copied ✓"; setTimeout(() => (btn.textContent = o), 1700); }, () => prompt("Copy this share link:", link));
+  };
+  $("bang-import").onclick = () => { const v = prompt("Paste a share link or code:"); if (!v) return; const code = (v.match(/[#=]([A-Za-z0-9_-]+)$/) || [, v.trim()])[1]; const obj = shareDecode(code); if (obj && obj.t === "ssp-search") importSearches(obj.d); else alert("That doesn't look like a valid search-share code."); };
+  if ($("bang-bookmarklet")) $("bang-bookmarklet").href = bookmarkletHref();
 
   $("backup-export").onclick = exportSettings;
   $("backup-import").onclick = () => $("backup-file").click();
@@ -1891,6 +1965,7 @@ refreshBackground(false);
 renderLinks();
 loadWeather();
 bindControls();
+handleShareHash();                                          // a shared "#import=" / bookmarklet link → offer to add the searches
 window.addEventListener("pageshow", assertFocus);
 /* Refocus the box when returning to this tab/window — but never steal focus
    from another field (e.g. a settings input) the user was working in. */

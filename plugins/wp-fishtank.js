@@ -44,13 +44,14 @@ const SPECIES = {
 const SCENES = {
   tank:   { name: "Fish tank", themed: true, species: ["round", "slim", "angel"], grads: [0, 1, 2, 3, 4, 5, 6, 7], creatures: [], plantN: 10, plantStyle: "lush", rayN: 5, rayDim: 1, biolum: 0, bg: 1 },
   lagoon: { name: "Lagoon", water: ["#1ba0d6", "#0e63a0", "#06335e"], ray: "#e2f4ff", plant: ["#3ec06a", "#2c8050", "#b8543a"], species: ["round", "slim", "angel"], grads: [0, 1, 2, 3, 4, 5, 7], creatures: ["crab", "crab"], plantN: 13, plantStyle: "lush", rayN: 6, rayDim: 1.15, biolum: 0, bg: 1.08 },
-  deep:   { name: "Deep", water: ["#0a2342", "#05132a", "#01060f"], ray: "#3f5e9a", plant: ["#1f5a52", "#143e3a", "#3a2a5e"], species: ["angler", "slim", "angel"], grads: [8, 9, 10, 11, 12], creatures: ["jelly", "jelly", "jelly"], plantN: 4, plantStyle: "sparse", rayN: 3, rayDim: 0.5, biolum: 28, bg: 0.62 },
+  deep:   { name: "Deep", water: ["#0a2342", "#05132a", "#01060f"], ray: "#3f5e9a", plant: ["#1f5a52", "#143e3a", "#3a2a5e"], species: ["angler", "slim", "angel"], grads: [8, 9, 10, 11, 12], creatures: ["jelly", "jelly", "jelly"], plantN: 4, plantStyle: "sparse", rayN: 3, rayDim: 0.5, biolum: 18, bg: 0.62 },
 };
 const DENSITY = { few: 5, some: 9, many: 14 };
 const LIVE = { calm: { spd: 16, tail: 1.7 }, lively: { spd: 30, tail: 1.05 }, bold: { spd: 48, tail: 0.62 } };
 
-let api = null, layer = null, svg = null, raf = 0, running = false, last = 0, t = 0;
+let api = null, layer = null, svg = null, raf = 0, running = false, last = 0, t = 0, acc = 0;
 let fish = [], creatures = [];
+const FPS = { calm: 30, lively: 45, bold: 60 };   // cap JS steering by liveliness — calm scenes do far less work
 
 function scene() {
   const base = SCENES[SET.scene] || SCENES.tank;
@@ -86,7 +87,7 @@ function defs() {
   s.plant.forEach((c, i) => { const d = hexRgb(c); g += `<linearGradient id="ft-plant${i}" x1="0" y1="1" x2="0.2" y2="0"><stop offset="0" stop-color="rgb(${d[0] * 0.55 | 0},${d[1] * 0.55 | 0},${d[2] * 0.55 | 0})"/><stop offset="1" stop-color="${c}"/></linearGradient>`; });
   GRADS.forEach((cols, i) => { g += `<linearGradient id="ft-fg${i}" x1="0" y1="0.1" x2="1" y2="0.9"><stop offset="0" stop-color="${cols[0]}"/><stop offset="0.5" stop-color="${cols[1]}"/><stop offset="1" stop-color="${cols[2]}"/></linearGradient>`; });
   g += `<filter id="ft-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2"/></filter>`;
-  g += `<filter id="ft-caustic"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.022" numOctaves="2" seed="7" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 -0.62"/></filter>`;
+  g += `<filter id="ft-caustic"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.022" numOctaves="1" seed="7" stitchTiles="stitch" result="n"/><feColorMatrix in="n" type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1.1 -0.62"/></filter>`;
   return `<defs>${g}</defs>`;
 }
 
@@ -100,7 +101,7 @@ function broadleaf(ox, w, hh, grad, op) {
   for (let k = 1; k <= 3; k++) { const ly = -hh * (0.3 + k * 0.2), side = k % 2 ? 1 : -1, lw = w * (1 - k * 0.12); s += `<path d="M${ox} ${ly} C ${ox + side * lw} ${ly - 6}, ${ox + side * lw} ${ly - 28}, ${ox + side * 4} ${ly - 34} C ${ox - side * 2} ${ly - 22}, ${ox} ${ly - 10}, ${ox} ${ly} Z" fill="url(#${grad})" opacity="${op}"/>`; }
   return s;
 }
-function plantCluster(x, baseW, h, style, plant3, accentChance) {
+function plantCluster(x, baseW, h, style, accentChance, sway) {
   let inner = "";
   if (style === "broad" || (style === "lush" && Math.random() < 0.32)) {
     inner = broadleaf(rnd(-baseW, baseW), baseW * 1.6, h * 0.82, "ft-plant" + (Math.random() < accentChance ? 2 : 1), 0.92);
@@ -111,7 +112,8 @@ function plantCluster(x, baseW, h, style, plant3, accentChance) {
     const n = 3 + (Math.random() * 2 | 0);
     for (let i = 0; i < n; i++) inner += blade(rnd(-baseW, baseW), baseW * rnd(0.5, 1), h * rnd(0.7, 1.1), rnd(-26, 26), "ft-plant" + (Math.random() < accentChance ? 2 : (Math.random() < 0.5 ? 0 : 1)));
   }
-  return `<g style="transform:translate(${x}px,${VH}px)"><g class="ft-plant" style="animation-duration:${rnd(5, 9).toFixed(1)}s; animation-delay:${rnd(-4, 0).toFixed(1)}s">${inner}</g></g>`;
+  const a = sway === false ? "" : ` class="ft-plant" style="animation-duration:${rnd(5, 9).toFixed(1)}s; animation-delay:${rnd(-4, 0).toFixed(1)}s"`;
+  return `<g style="transform:translate(${x}px,${VH}px)"><g${a}>${inner}</g></g>`;   // background plants don't sway → their blur rasterizes once
 }
 
 /* ---------- bubbles & biolum ---------- */
@@ -135,7 +137,7 @@ function fishMarkup(f) {
   if (sp.teeth) extra += `<path d="${sp.teeth}" stroke="#eef3ff" stroke-width="1.5" fill="none" opacity="0.85"/>`;
   let lure = "";
   if (sp.lure) lure = `<path d="${sp.lure}" stroke="#caa84c" stroke-width="2" fill="none" opacity="0.7"/><g class="ft-lurebulb" style="transform:translate(54px,-50px)"><circle r="13" fill="url(#ft-lure)"/><circle r="3.4" fill="#fffbe0"/></g>`;
-  return `<g class="ft-fish" data-i="${f.i}" style="filter:${f.blur ? "url(#ft-soft)" : "none"};opacity:${f.op}">
+  return `<g class="ft-fish" data-i="${f.i}" style="opacity:${f.op}">
     <g class="ft-tail" style="animation-duration:${f.tailDur}s"><path d="${sp.tail}" fill="url(#${gid})" opacity="0.85"/></g>
     <path d="${sp.dorsal}" fill="url(#${gid})" opacity="0.72"/><path d="${sp.anal}" fill="url(#${gid})" opacity="0.72"/>
     ${extra}
@@ -153,7 +155,7 @@ function makeFish() {
     fish.push({
       i, sp: s.species[(Math.random() * s.species.length) | 0], g: s.grads[(Math.random() * s.grads.length) | 0],
       x: rnd(0, VW), baseY: rnd(120, VH - 150), y: 0, dir: Math.random() < 0.5 ? 1 : -1,
-      scale, op: 0.55 + depth * 0.45, blur: depth < 0.34, speed: lv.spd * rnd(0.7, 1.3) * (0.6 + depth * 0.7),
+      scale, op: 0.42 + depth * 0.55, speed: lv.spd * rnd(0.7, 1.3) * (0.6 + depth * 0.7),   // depth now via scale + opacity only (no blur)
       bobAmp: rnd(10, 26), bobFreq: rnd(0.5, 1.1), phase: rnd(0, 7), tilt: 0, tailDur: (lv.tail * rnd(0.85, 1.2)).toFixed(2),
     });
   }
@@ -183,7 +185,7 @@ function jellyMarkup(c) {
 function makeCreatures() {
   const s = scene(); creatures = [];
   (s.creatures || []).forEach((kind, i) => {
-    if (kind === "crab") creatures.push({ i, kind, x: rnd(120, VW - 120), y: VH - rnd(18, 40), dir: Math.random() < 0.5 ? 1 : -1, speed: rnd(14, 26), bob: rnd(0, 7) });
+    if (kind === "crab") creatures.push({ i, kind, x: rnd(120, VW - 120), y: VH - rnd(95, 130), dir: Math.random() < 0.5 ? 1 : -1, speed: rnd(14, 26), bob: rnd(0, 7) });   // kept clear of the bottom so 'slice' cropping never halves it
     else if (kind === "jelly") { const depth = Math.random(); creatures.push({ i, kind, x: rnd(120, VW - 120), y: rnd(120, VH - 220), dir: Math.random() < 0.5 ? 1 : -1, speed: rnd(6, 13), scale: 0.6 + depth * 0.7, op: 0.5 + depth * 0.4, vy: rnd(-7, 7), phase: rnd(0, 7), pulse: rnd(3.2, 5).toFixed(1) }); }
   });
 }
@@ -201,7 +203,7 @@ function buildScene() {
   if (s.biolum) html += biolumField(s.biolum);
   // background plants (blurred)
   let back = ""; const bn = Math.round(s.plantN * 0.45);
-  for (let i = 0; i < bn; i++) back += plantCluster(rnd(0, VW), rnd(24, 44), rnd(240, 440), s.plantStyle === "sparse" ? "sparse" : "blade", 0);
+  for (let i = 0; i < bn; i++) back += plantCluster(rnd(0, VW), rnd(24, 44), rnd(240, 440), s.plantStyle === "sparse" ? "sparse" : "blade", 0, false);
   html += `<g style="filter:url(#ft-soft);opacity:0.7">${back}</g>`;
   html += `<g class="ft-creatures-back"></g>`;
   html += `<g class="ft-fishlayer"></g>`;
@@ -210,7 +212,7 @@ function buildScene() {
   let front = ""; const fn = s.plantN - bn;
   for (let i = 0; i < fn; i++) front += plantCluster(rnd(0, VW), rnd(32, 58), rnd(280, 540), s.plantStyle, 0.22);
   html += `<g>${front}</g>`;
-  let bub = ""; const bubN = s.biolum ? 3 : 6; for (let i = 0; i < bubN; i++) bub += bubbleCol(rnd(0.08, 0.92) * VW);
+  let bub = ""; const bubN = Math.round(({ calm: 3, lively: 5, bold: 7 }[SET.liveliness] || 4) * (s.biolum ? 0.5 : 1)); for (let i = 0; i < bubN; i++) bub += bubbleCol(rnd(0.08, 0.92) * VW);   // calmer scenes = fewer continuously-animating bubbles
   html += `<g>${bub}</g>`;
   html += `<rect width="${VW}" height="${VH}" fill="url(#ft-vignette)" pointer-events="none"/>`;
   svg.innerHTML = html;
@@ -255,8 +257,14 @@ function placeAll(dt) {
     }
   }
 }
-function frame(ts) { if (!running) return; const dt = Math.min(0.05, (ts - (last || ts)) / 1000); last = ts; t += dt; placeAll(dt); raf = requestAnimationFrame(frame); }
-function start() { if (running) return; if (api && api.reducedMotion()) { placeAll(0); return; } running = true; last = 0; raf = requestAnimationFrame(frame); }
+function frame(ts) {
+  if (!running) return;
+  const dt = Math.min(0.05, (ts - (last || ts)) / 1000); last = ts; acc += dt;
+  const step = 1 / (FPS[SET.liveliness] || 30);
+  if (acc >= step) { t += acc; placeAll(acc); acc = 0; }   // only move the swimmers at the capped rate (time-based, so speed is unchanged)
+  raf = requestAnimationFrame(frame);
+}
+function start() { if (running) return; if (api && api.reducedMotion()) { placeAll(0); return; } running = true; last = 0; acc = 0; raf = requestAnimationFrame(frame); }
 function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
 function onVis() { if (document.hidden) { stop(); if (svg) svg.classList.add("ft-paused"); } else { if (svg) svg.classList.remove("ft-paused"); start(); } }
 function rebuild() { if (!svg) return; reportContrast(); buildScene(); applyMotionFlag(); }
@@ -275,8 +283,8 @@ const SCSS = `
 @keyframes ft-sway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3.5deg); } }
 .ft-ray { animation: ft-raymove 12s ease-in-out infinite; transform-box: view-box; }
 @keyframes ft-raymove { 0%,100% { transform: translateX(-26px); opacity: 0.55; } 50% { transform: translateX(26px); opacity: 0.95; } }
-.ft-caustic { animation: ft-caus 18s ease-in-out infinite; transform-box: view-box; transform-origin: 50% 50%; }
-@keyframes ft-caus { 0%,100% { transform: translate(0,0) scale(1.05); opacity: 0.4; } 50% { transform: translate(40px,18px) scale(1.12); opacity: 0.6; } }
+.ft-caustic { animation: ft-caus 16s ease-in-out infinite; }   /* opacity-only → the turbulence rasterizes ONCE, never re-rastered per frame */
+@keyframes ft-caus { 0%,100% { opacity: 0.32; } 50% { opacity: 0.6; } }
 .ft-brise { animation: ft-rise linear infinite; }
 @keyframes ft-rise { 0% { transform: translateY(0); opacity: 0; } 10% { opacity: 0.85; } 88% { opacity: 0.6; } 100% { transform: translateY(-${VH + 40}px); opacity: 0; } }
 .ft-bwob { animation: ft-wob ease-in-out infinite alternate; }

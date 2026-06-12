@@ -78,15 +78,16 @@ backend, no Google.
       Light/Dark text.
     - **Matrix rain** — the classic cascading glyph columns with bright heads and
       fading trails. Four colours, Ambient/Lively/Bold speed, Auto/Light/Dark text.
-    - **Fish tank** — a planted aquarium, all SVG, with three **distinct worlds**:
+    - **Dioramas** — little living worlds, all SVG, across four **distinct scenes**:
       a customisable **Fish tank** (one-click colour themes — amethyst, aqua, blue,
-      planted, rose, slate), a bright **Lagoon** (the liveliest — crabs scuttle the
-      floor), and a very dark **Deep** (drifting jellyfish, an anglerfish with a
-      glowing lure, bioluminescent motes). Gradient multicolour fish at varying
-      depths (parallax — near ones big and sharp, far ones small and soft), an
-      elegant angelfish, varied plants, rising bubbles, drifting sun shafts and a
-      caustic shimmer. Few/Some/Many fish, Calm/Lively/Bold. Fish glide *behind*
-      the frosted omnibox.
+      planted, rose, slate), a bright **Lagoon** (crabs scuttle the floor), a very
+      dark **Deep** (drifting jellyfish, an anglerfish with a glowing lure,
+      bioluminescent motes), and a **Jungle** — a leafy canopy, sun shafts, vines,
+      and a **monkey family** living in the trees (one with a bow, one in glasses,
+      bananas all round) who idle, snack, and leap between branches while beetles
+      climb the trunks. Gradient creatures at varying depths (parallax), varied
+      plants, ambient light & motion. Few/Some/Many, Calm/Lively/Bold; reduced-motion
+      and hidden-tab aware.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.

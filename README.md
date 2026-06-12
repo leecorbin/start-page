@@ -78,6 +78,11 @@ backend, no Google.
       Light/Dark text.
     - **Matrix rain** — the classic cascading glyph columns with bright heads and
       fading trails. Four colours, Ambient/Lively/Bold speed, Auto/Light/Dark text.
+    - **Fish tank** — a planted aquarium, all SVG: gradient multicolour fish
+      swimming at varying depths (parallax — near ones big and sharp, far ones
+      small and soft), swaying kelp, rising bubbles, drifting sun shafts and a
+      caustic shimmer. Three scenes (Reef/Lagoon/Deep), Few/Some/Many fish,
+      Calm/Lively/Bold. Fish glide *behind* the frosted omnibox.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.

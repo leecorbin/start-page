@@ -78,7 +78,8 @@ backend, no Google.
       Light/Dark text.
     - **Matrix rain** — the classic cascading glyph columns with bright heads and
       fading trails. Four colours, Ambient/Lively/Bold speed, Auto/Light/Dark text.
-    - **Dioramas** — little living worlds, all SVG, across four **distinct scenes**:
+    - **Dioramas** — little living worlds (canvas-rendered for smooth performance)
+      across four **distinct scenes**:
       a customisable **Fish tank** (one-click colour themes — amethyst, aqua, blue,
       planted, rose, slate), a bright **Lagoon** (crabs scuttle the floor), a very
       dark **Deep** (drifting jellyfish, an anglerfish with a glowing lure,

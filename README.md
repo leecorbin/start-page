@@ -88,7 +88,9 @@ backend, no Google.
       bananas all round) who idle, snack, and leap between branches while beetles
       climb the trunks. Gradient creatures at varying depths (parallax), varied
       plants, ambient light & motion. Few/Some/Many, Calm/Lively/Bold; reduced-motion
-      and hidden-tab aware.
+      and hidden-tab aware. With **Awareness** on (a toggle), the fish are *aware of
+      the page* — they steer over and under the search box rather than behind it, and
+      now and then one drifts up to **nibble the clock**.
   - ⬇ **Download** the current photo to keep it locally.
 - 🌤️ **Local weather** — keyless via [Open-Meteo](https://open-meteo.com); set a city
   or use your location. Understated icon + temperature.

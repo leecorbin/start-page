@@ -913,6 +913,10 @@ function maybeSuggest() {
 }
 input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 
+/* Bump on every deploy that changes a plugin — appended to plugin import URLs
+   so browsers fetch the new code instead of a hard-cached ES module. */
+const APP_VERSION = "2026.06.12";
+
 /* ---- plugin host: lazy-loaded omnibox plugins ----
    Type a trigger (e.g. "==") and the omnibox slides open into that plugin.
    The registry below holds what's needed BEFORE load (trigger, chip, height);
@@ -970,7 +974,7 @@ async function openPlugin(def, initial) {
   pluginPanel.classList.add("loading", "open");
   pluginPanel.style.height = (def.height || 160) + "px";
   try {
-    const mod = (await import(def.src)).default;
+    const mod = (await import(def.src + "?v=" + APP_VERSION)).default;
     if (!activePlugin || activePlugin.gen !== gen) return;   // closed while loading
     activePlugin.mod = mod;
     const api = {
@@ -1280,7 +1284,7 @@ async function mountWallpaper(id) {
   const token = ++wpGen;
   wpEl.classList.add("on");                               // the CSS gradient shows instantly while the module fetches
   try {
-    const mod = (await import(def.src)).default;
+    const mod = (await import(def.src + "?v=" + APP_VERSION)).default;
     if (token !== wpGen) return;                           // provider changed while loading
     activeWallpaper = { id, def, mod };
     try { mod.mount(wpEl, wallpaperApi); } catch (e) { console.error(e); }

@@ -120,8 +120,8 @@ function makePlant(x, baseW, h, style, accentChance, sway) {
 function makeFish() {
   const s = scn(), n = DENSITY[SET.density] || 9, lv = live(); fish = [];
   for (let i = 0; i < n; i++) {
-    const depth = Math.random();
-    fish.push({ sp: s.species[Math.random() * s.species.length | 0], g: s.grads[Math.random() * s.grads.length | 0], x: rnd(0, VW), baseY: rnd(120, VH - 150), y: 0, dir: Math.random() < 0.5 ? 1 : -1, scale: 0.5 + depth * 0.85, op: 0.42 + depth * 0.55, speed: lv.spd * rnd(0.7, 1.3) * (0.6 + depth * 0.7), bobAmp: rnd(10, 26), bobFreq: rnd(0.5, 1.1), phase: rnd(0, TAU), tilt: 0, tailFreq: TAU / (lv.tail * rnd(0.85, 1.2)) });
+    const depth = Math.random(), baseY = rnd(120, VH - 150);
+    fish.push({ sp: s.species[Math.random() * s.species.length | 0], g: s.grads[Math.random() * s.grads.length | 0], x: rnd(0, VW), baseY, homeY: baseY, y: 0, dir: Math.random() < 0.5 ? 1 : -1, scale: 0.5 + depth * 0.85, op: 0.42 + depth * 0.55, speed: lv.spd * rnd(0.7, 1.3) * (0.6 + depth * 0.7), bobAmp: rnd(10, 26), bobFreq: rnd(0.5, 1.1), phase: rnd(0, TAU), tilt: 0, vBase: 0, avoidSide: 0, fg: depth > 0.5, tailFreq: TAU / (lv.tail * rnd(0.85, 1.2)) });
   }
   fish.sort((a, b) => a.scale - b.scale);
 }
@@ -170,32 +170,51 @@ function refreshObstacles() {
   if (SET.aware !== "on" || !api || !api.obstacles || scn().jungle) return;
   for (const o of api.obstacles()) { const d = toDesign(o); if (o.tag === "box") boxes.push(d); else if (o.tag === "clock" && !clockBox) clockBox = d; }
 }
-function applyAvoid(f, dt) {                                                         // steer a fish over/under the omnibox
-  let box = null; for (const b of boxes) if (f.x > b.x - 70 && f.x < b.x + b.w + 70) { box = b; break; }
-  if (box) {
-    if (f.avoidY == null && f.baseY > box.y - 52 && f.baseY < box.y + box.h + 52) f.avoidY = f.baseY < box.y + box.h / 2 ? box.y - 52 : box.y + box.h + 52;
-    if (f.avoidY != null) { f.baseY += Math.sign(f.avoidY - f.baseY) * Math.min(Math.abs(f.avoidY - f.baseY), 150 * dt); return; }
-  } else f.avoidY = null;
-  f.baseY += Math.sin(t * 0.15 + f.phase) * 6 * dt;
+function avoidTarget(f) {                                                            // a smooth vertical target that arcs a foreground fish clear of the omnibox
+  let target = f.homeY, best = 0;
+  for (const b of boxes) {
+    const M = 160;                                                                  // begin steering this far before the box, relax this far after
+    if (f.x < b.x - M || f.x > b.x + b.w + M) continue;
+    if (f.homeY < b.y - 64 || f.homeY > b.y + b.h + 64) continue;                    // its cruising line clears the box anyway → ignore
+    const dx = Math.max(b.x - f.x, f.x - (b.x + b.w), 0);                            // 0 while horizontally over the box
+    let ix = 1 - dx / M; ix = ix * ix * (3 - 2 * ix);                               // smoothstep ramp 0→1→0
+    const pad = 48;
+    if (!f.avoidSide) {                                                              // commit to a side once, so it doesn't dither
+      const above = f.homeY < b.y + b.h / 2, canUp = b.y - pad > 96, canDown = b.y + b.h + pad < VH - 120;
+      f.avoidSide = above ? (canUp ? -1 : 1) : (canDown ? 1 : -1);
+    }
+    const clearY = f.avoidSide < 0 ? b.y - pad : b.y + b.h + pad;
+    if (ix > best) { best = ix; target = f.homeY + (clearY - f.homeY) * ix; }        // blend home↔clear by proximity
+  }
+  if (!best) f.avoidSide = 0;
+  return target;
 }
-function nibbleStep(f, dt) {                                                         // a fish drifts up to the clock and pecks at it
+function nibbleStep(f, dt) {                                                         // a fish drifts up to the clock, pecks, then glides back down
   const cx = clockBox.x + clockBox.w / 2, cy = clockBox.y + clockBox.h, n = f.nib;
-  if (n.ph === 0) {
-    const ty = cy + 32; f.dir = cx > f.x ? 1 : -1;
-    f.x += Math.sign(cx - f.x) * Math.min(Math.abs(cx - f.x), f.speed * 1.5 * dt);
-    f.baseY += Math.sign(ty - f.baseY) * Math.min(Math.abs(ty - f.baseY), f.speed * 1.5 * dt);
-    f.y = f.baseY; f.tilt = -0.12 * f.dir;
-    if (Math.abs(cx - f.x) < 28 && Math.abs(ty - f.baseY) < 28) { n.ph = 1; n.timer = rnd(2.2, 4); }
-  } else {
-    n.timer -= dt; f.dir = cx > f.x ? 1 : -1;
-    f.y = cy + 28 - Math.max(0, Math.sin(t * 7)) * 22; f.tilt = -0.32;              // quick darts up at the clock
-    if (n.timer <= 0) { f.nib = null; nibbler = null; f.baseY = f.y; }
+  f.dir = cx > f.x ? 1 : -1;
+  if (n.ph === 0) {                                                                  // approach — ease in position and tilt up
+    const ty = cy + 30;
+    f.x += Math.sign(cx - f.x) * Math.min(Math.abs(cx - f.x), f.speed * 1.4 * dt);
+    f.baseY += (ty - f.baseY) * (1 - Math.exp(-3.5 * dt)); f.y = f.baseY;
+    f.tilt += ((-0.14 * f.dir) - f.tilt) * Math.min(1, 6 * dt);
+    if (Math.abs(cx - f.x) < 26 && Math.abs(ty - f.baseY) < 24) { n.ph = 1; n.timer = rnd(2.2, 4); }
+  } else if (n.ph === 1) {                                                           // peck — quick darts up at the clock
+    n.timer -= dt;
+    f.y = cy + 26 - Math.max(0, Math.sin(t * 7)) * 20; f.tilt = -0.3 * f.dir;
+    if (n.timer <= 0) { n.ph = 2; n.settle = 0; f.baseY = f.y; }
+  } else {                                                                           // settle — glide gently back to the cruising line, bob fading in
+    n.settle += dt;
+    f.x += f.dir * f.speed * 0.55 * dt;
+    f.baseY += (f.homeY - f.baseY) * (1 - Math.exp(-3 * dt));
+    f.y = f.baseY + Math.cos(t * f.bobFreq + f.phase) * f.bobAmp * Math.min(1, n.settle);
+    f.tilt += ((-Math.sin(t * f.bobFreq + f.phase) * 0.1 * f.dir) - f.tilt) * Math.min(1, 5 * dt);
+    if (Math.abs(f.baseY - f.homeY) < 16 || n.settle > 3.5) { f.nib = null; nibbler = null; f.avoidSide = 0; }
   }
 }
 function scheduleNibble(dt) {
   if (SET.aware !== "on" || scn().jungle || !clockBox || nibbler || !fish.length) return;
   nibbleNext -= dt;
-  if (nibbleNext <= 0) { nibbler = fish[Math.random() * fish.length | 0]; if (nibbler) nibbler.nib = { ph: 0, timer: 0 }; nibbleNext = rnd(16, 38); }
+  if (nibbleNext <= 0) { const fg = fish.filter((f) => f.fg); nibbler = (fg.length ? fg : fish)[Math.random() * (fg.length || fish.length) | 0]; if (nibbler) nibbler.nib = { ph: 0, timer: 0 }; nibbleNext = rnd(16, 38); }
 }
 
 /* ---------- steering (positions only) ---------- */
@@ -213,10 +232,16 @@ function step(dt) {
     f.nib = null;
     if (dt) {
       f.x += f.dir * f.speed * dt; if (f.x > VW + 80 && f.dir > 0) f.dir = -1; else if (f.x < -80 && f.dir < 0) f.dir = 1;
-      if (SET.aware === "on" && boxes.length) applyAvoid(f, dt); else { f.avoidY = null; f.baseY += Math.sin(t * 0.15 + f.phase) * 6 * dt; }
+      f.homeY += Math.sin(t * 0.15 + f.phase) * 6 * dt;                              // natural slow wander of the cruising line
+      f.homeY = Math.max(90, Math.min(VH - 120, f.homeY));
+      const target = (SET.aware === "on" && f.fg && boxes.length) ? avoidTarget(f) : (f.avoidSide = 0, f.homeY);   // only close (foreground) fish mind the box
+      const prev = f.baseY;
+      f.baseY += (target - f.baseY) * (1 - Math.exp(-5 * dt));                       // critically-damped ease — smooth in and out
       f.baseY = Math.max(90, Math.min(VH - 120, f.baseY));
+      f.vBase = (f.baseY - prev) / Math.max(dt, 1e-3);
     }
-    f.y = f.baseY + Math.cos(t * f.bobFreq + f.phase) * f.bobAmp; f.tilt = -Math.sin(t * f.bobFreq + f.phase) * 0.1 * f.dir;
+    f.y = f.baseY + Math.cos(t * f.bobFreq + f.phase) * f.bobAmp;
+    f.tilt = (-Math.sin(t * f.bobFreq + f.phase) * 0.1 + Math.max(-0.3, Math.min(0.3, f.vBase * 0.0016))) * f.dir;   // nose banks into the climb/dive
   }
   for (const c of creatures) {
     if (c.kind === "crab") { if (dt) { c.x += c.dir * c.speed * dt; if (c.x > VW - 90 && c.dir > 0) c.dir = -1; else if (c.x < 90 && c.dir < 0) c.dir = 1; } }
@@ -389,7 +414,7 @@ function settings(root, hostApi) {
     + (api && api.reducedMotion() ? `<div class="ftp-note">Your system has “reduce motion” on, so the scene stays still.</div>` : ``);
   root.onclick = (e) => {
     const a = e.target.closest("[data-scene],[data-theme],[data-density],[data-liveliness],[data-text],[data-aware]"); if (!a) return;
-    if (a.dataset.aware != null) { SET.aware = a.dataset.aware; persist(); if (SET.aware === "on") refreshObstacles(); else { fish.forEach((f) => { f.avoidY = null; f.nib = null; }); nibbler = null; boxes = []; clockBox = null; } return settings(root, api); }   // no rebuild — keep the fish where they are
+    if (a.dataset.aware != null) { SET.aware = a.dataset.aware; persist(); if (SET.aware === "on") refreshObstacles(); else { fish.forEach((f) => { f.avoidSide = 0; f.nib = null; }); nibbler = null; boxes = []; clockBox = null; } return settings(root, api); }   // no rebuild — keep the fish where they are
     if (a.dataset.scene != null) SET.scene = a.dataset.scene;
     else if (a.dataset.theme != null) SET.tankTheme = a.dataset.theme;
     else if (a.dataset.density != null) SET.density = a.dataset.density;

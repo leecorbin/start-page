@@ -13,10 +13,11 @@ const CSS = `
 .arc-sub { font-size: 0.76rem; color: ${MUT}; }
 .arc-cards { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; min-height: 0; }
 .arc-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.42rem; background: rgba(255,255,255,0.05); border: 1px solid var(--field-border, rgba(255,255,255,0.12)); border-radius: 14px; color: ${FG}; cursor: pointer; padding: 0.8rem 0.6rem; font: inherit; transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease; }
-.arc-card:hover, .arc-card.sel { background: rgba(91,155,255,0.14); border-color: rgba(91,155,255,0.5); transform: translateY(-2px); }
+/* a single highlight, driven by .sel (mouseenter + keyboard both set it) — no separate :hover, so the two never fight */
+.arc-card.sel { background: rgba(91,155,255,0.14); border-color: rgba(91,155,255,0.5); transform: translateY(-2px); }
 .arc-ic { width: 44px; height: 44px; display: grid; place-items: center; color: #9fb4d8; transition: color 0.15s ease; }
 .arc-ic svg { width: 100%; height: 100%; }
-.arc-card:hover .arc-ic, .arc-card.sel .arc-ic { color: ${ACC}; }
+.arc-card.sel .arc-ic { color: ${ACC}; }
 .arc-name { font-size: 0.98rem; font-weight: 600; }
 .arc-tip { font-size: 0.72rem; color: ${MUT}; text-align: center; }
 .arc-best { font-size: 0.72rem; color: ${GRN}; min-height: 0.9rem; }
@@ -77,17 +78,21 @@ function T(s, x, y, size, col, align, weight) {
   ctx.fillStyle = col; ctx.font = `${weight || 600} ${size}px ${RF}`;
   ctx.textAlign = align || "left"; ctx.textBaseline = "middle"; ctx.fillText(s, x, y);
 }
-// a glossy game block: rounded fill + a soft top sheen
+// "#rrggbb" or "rgb(r,g,b)" → rgba(...) at the given alpha
+function withAlpha(col, a) {
+  if (col[0] === "#") { const n = parseInt(col.slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+  return col.replace(/^rgb\(/, "rgba(").replace(/\)$/, `,${a})`);
+}
+// a flat game block: a translucent tint of its colour with a crisp coloured border — no gradient, no shadow
 function block(x, y, s, col) {
-  const r = Math.max(2, s * 0.16), p = Math.max(0.5, s * 0.06);
-  fillRR(x + p, y + p, s - 2 * p, s - 2 * p, r, col);
-  ctx.save(); RR(x + p, y + p, s - 2 * p, s - 2 * p, r); ctx.clip();
-  ctx.fillStyle = "rgba(255,255,255,0.18)"; ctx.fillRect(x, y, s, s * 0.42);
-  ctx.restore();
+  const p = Math.max(0.5, s * 0.06), r = Math.max(2.5, s * 0.16);
+  RR(x + p, y + p, s - 2 * p, s - 2 * p, r);
+  ctx.fillStyle = withAlpha(col, 0.2); ctx.fill();
+  ctx.lineWidth = Math.max(1.2, Math.min(2.4, s * 0.05)); ctx.strokeStyle = withAlpha(col, 0.9); ctx.stroke();
 }
 
 /* ============================ 2048 ============================ */
-const C2048 = { 2: "#36405a", 4: "#3f5374", 8: "#4f74b6", 16: ACC, 32: "#6f8be8", 64: "#8a7be8", 128: "#b873d6", 256: "#d56fa8", 512: "#e0896f", 1024: "#e0b56f", 2048: GRN };
+const C2048 = { 2: "#9aa8c4", 4: "#6f9ad6", 8: ACC, 16: "#6f8be8", 32: "#8a7be8", 64: "#b873d6", 128: "#d56fa8", 256: "#e0896f", 512: "#e0b56f", 1024: "#cdd472", 2048: GRN };
 // compress + merge one row toward index 0 (pure)
 function slide2048(v) {
   const f = v.filter((x) => x), o = []; let gain = 0;
@@ -122,10 +127,10 @@ function make2048() {
       const x = bx + gap + (i % 4) * (cs + gap), y = by + gap + (i / 4 | 0) * (cs + gap);
       fillRR(x, y, cs, cs, cs * 0.14, "rgba(255,255,255,0.04)");
       const v = g[i]; if (!v) continue;
-      const sc = 1 - 0.42 * anim[i], d = cs * (1 - sc) / 2;
-      block(x + d, y + d, cs * sc, C2048[v] || GRN);
-      const light = v >= 1024, fs = cs * (v < 100 ? 0.42 : v < 1000 ? 0.33 : 0.27);
-      T(v, x + cs / 2, y + cs / 2 + 1, fs * sc, light ? "#10161f" : FG, "center", 700);
+      const sc = 1 - 0.42 * anim[i], d = cs * (1 - sc) / 2, col = C2048[v] || GRN;
+      block(x + d, y + d, cs * sc, col);
+      const fs = cs * (v < 100 ? 0.42 : v < 1000 ? 0.33 : 0.27);
+      T(v, x + cs / 2, y + cs / 2 + 1, fs * sc, withAlpha(col, 1), "center", 700);
     }
     const sx = leftW + 6, top = by + 4;
     T("2048", sx, top + 8, 21, FG, "left", 700);
@@ -167,11 +172,10 @@ function makeSnake() {
     T(`score ${self.score}`, W - PADX, HEAD / 2 + 5, 13, ACC, "right", 700);
     T(`best ${best.snake || 0}`, W - PADX - 92, HEAD / 2 + 5, 12, GRN, "right");
     fillRR(ox - 6, oy - 6, gw + 12, gh + 12, 12, "rgba(255,255,255,0.035)");
-    // food — a soft glowing dot
-    const fx = ox + food.x * cs + cs / 2, fy = oy + food.y * cs + cs / 2;
-    const gr = ctx.createRadialGradient(fx, fy, 1, fx, fy, cs * 0.9); gr.addColorStop(0, "rgba(91,155,255,0.5)"); gr.addColorStop(1, "rgba(91,155,255,0)");
-    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(fx, fy, cs * 0.9, 0, 7); ctx.fill();
-    ctx.fillStyle = ACC; ctx.beginPath(); ctx.arc(fx, fy, cs * 0.3, 0, 7); ctx.fill();
+    // food — a flat tinted dot with a crisp ring, matching the blocks
+    const fx = ox + food.x * cs + cs / 2, fy = oy + food.y * cs + cs / 2, fr = cs * 0.3;
+    ctx.beginPath(); ctx.arc(fx, fy, fr, 0, 7); ctx.fillStyle = withAlpha(ACC, 0.25); ctx.fill();
+    ctx.lineWidth = Math.max(1.4, cs * 0.06); ctx.strokeStyle = withAlpha(ACC, 0.95); ctx.stroke();
     // snake — head bright, body easing to a deeper green
     for (let i = snake.length - 1; i >= 0; i--) {
       const s = snake[i], t = i / Math.max(1, snake.length - 1);
@@ -236,7 +240,8 @@ function makeTetris() {
     ctx.save(); RR(wx, wy, ww, wh, 4); ctx.clip();
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (bd[y][x]) block(wx + x * cell, wy + y * cell, cell, TC[bd[y][x] - 1]);
     const gy = ghostY();
-    piece.m.forEach((r, i) => r.forEach((v, j) => { if (v && gy + i >= 0) { fillRR(wx + (piece.x + j) * cell + cell * 0.08, wy + (gy + i) * cell + cell * 0.08, cell * 0.84, cell * 0.84, cell * 0.16, "rgba(255,255,255,0.08)"); } }));
+    ctx.lineWidth = 1.3; ctx.strokeStyle = withAlpha(TC[piece.c], 0.34);
+    piece.m.forEach((r, i) => r.forEach((v, j) => { if (v && gy + i >= 0) { RR(wx + (piece.x + j) * cell + cell * 0.1, wy + (gy + i) * cell + cell * 0.1, cell * 0.8, cell * 0.8, cell * 0.16); ctx.stroke(); } }));
     piece.m.forEach((r, i) => r.forEach((v, j) => { if (v && piece.y + i >= 0) block(wx + (piece.x + j) * cell, wy + (piece.y + i) * cell, cell, TC[piece.c]); }));
     ctx.restore();
     // sidebar
@@ -320,6 +325,7 @@ function onKey(e) {
   if (ae && ae.closest && ae.closest("#panel,.modal")) return;          // don't steal typing from settings/modals
   const k = e.key;
   if (k === "Escape") { if (view !== "home") { e.preventDefault(); e.stopPropagation(); showHome(); } return; }  // esc: game→launcher, launcher→close
+  if (k === "Backspace") return;                                       // let the host's "empty box → close plugin" do its usual job
   e.preventDefault(); e.stopPropagation();                             // from here the arcade owns the key
   if (k === "Enter") { if (view === "home") launch(GAMES[selIdx]); else if (cur && cur.over) { cur.reset(); paused = false; updatePauseBtn(); startLoop(); } return; }
   if (view === "home") {

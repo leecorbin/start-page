@@ -268,12 +268,22 @@ function overlay(title, sub) {
   T(title, W / 2, H / 2 - 12, 26, FG, "center", 700);
   T(sub, W / 2, H / 2 + 18, 13, MUT, "center");
 }
+// the score is the moment — title, then the score big, then the keys
+function gameOverOverlay() {
+  const cx = W / 2, cy = H / 2, big = Math.min(62, H * 0.16), hot = cur.newBest ? GRN : ACC;
+  ctx.fillStyle = "rgba(10,14,20,0.8)"; ctx.fillRect(0, 0, W, H);
+  T("Game over", cx, cy - big * 0.5 - 16, 20, withAlpha(FG, 0.82), "center", 600);
+  T(cur.score, cx, cy + 4, big, hot, "center", 700);
+  let ky = cy + big * 0.5 + 24;
+  if (cur.newBest) { T("✦ new best", cx, cy + big * 0.5 + 10, 13, GRN, "center", 700); ky = cy + big * 0.5 + 33; }
+  T("↵ or R  play again    ·    esc  menu", cx, ky, 12.5, MUT, "center");
+}
 function draw() {
   if (!ctx) return;
   ctx.clearRect(0, 0, W, H);
   cur.draw();
   if (paused) overlay("Paused", "P or ▶ to resume");
-  else if (cur.over) overlay("Game over", `score ${cur.score}${cur.newBest ? "  ·  new best!" : ""}   —   ↵ or R to play again`);
+  else if (cur.over) gameOverOverlay();
 }
 function frame(ts) {
   if (view === "home" || !cur) { raf = 0; return; }

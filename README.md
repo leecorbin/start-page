@@ -8,8 +8,8 @@ Inspired by [Bonjourr](https://bonjourr.fr), trimmed down and made hackable.
 The core stays tiny and instant; everything richer rides in optional files that
 only download when you use them — a **calculator** with live graphs, a **colour**
 lab, a **dictionary**, **image** and **map** search, a developer/text **tools**
-box, and animated **"living wallpapers"** (lava lamp, a weatherscape that matches
-your forecast, matrix rain). Every provider is **keyless** — no API keys, no
+box, a little **arcade** (2048, Snake, Tetris), and animated **"living wallpapers"**
+(lava lamp, a weatherscape that matches your forecast, matrix rain). Every provider is **keyless** — no API keys, no
 backend, no Google.
 
 ![start-page running as a Safari new-tab page](screenshot.png)
@@ -175,6 +175,11 @@ backend, no Google.
     Pick a **tile style** — Dark / Light / Voyager (crisp retina tiles from CARTO,
     built on OSM data) or OSM (OpenStreetMap's own tiles) — all keyless, no Google.
     Uses a lazy-loaded, **self-hosted** copy of Leaflet (`plugins/vendor/`).
+  - 🕹️ **Arcade** (`::`) — a tiny launcher for three casual games: **2048**,
+    **Snake** and **Tetris**, all drawn on one little canvas and using the omnibox's
+    extra landscape space. Keyboard-driven (arrows / WASD, space to drop or launch);
+    Back / Pause / Restart sit on the search box, `esc` steps back to the menu.
+    Jump straight in with `::snake`, `::2048` or `::tetris`. Best scores save locally.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency

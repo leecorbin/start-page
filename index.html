@@ -126,8 +126,8 @@
   #links { margin-top: 1.7rem; display: flex; gap: 1.0rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
   #links[hidden] { display: none; }
   #links a { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; text-decoration: none; transition: transform 0.15s ease, background 0.15s ease; }
-  .ql-tip { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgba(18,22,30,0.94); color: #fff; font-size: 0.72rem; white-space: nowrap; padding: 0.3rem 0.6rem; border-radius: 9px; pointer-events: none; opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 5; }
-  .ql-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: rgba(18,22,30,0.94); }
+  .ql-tip { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgb(18,22,30); color: #fff; font-size: 0.72rem; white-space: nowrap; padding: 0.3rem 0.6rem; border-radius: 9px; pointer-events: none; opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 7; }
+  .ql-tip::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: rgb(18,22,30); }
   #links a:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   #links a:hover { transform: translateY(-2px); background: rgba(255,255,255,0.10); }
   #links img { width: 22px; height: 22px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.55)); opacity: 0.85; transition: opacity 0.15s ease; }
@@ -168,6 +168,9 @@
   .plug-item img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
   .plug-item:hover .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   body.lc-light .plug-item img { filter: grayscale(1) brightness(0) drop-shadow(0 1px 2px rgba(255,255,255,0.5)); }
+  /* keyboard focus on the icon rows (↓ from the box) — mirror the hover lift, add an accent ring, and reveal the label */
+  #links a:focus-visible, .freq-item:focus-visible, .plug-item:focus-visible { outline: 2px solid rgba(91,155,255,0.8); outline-offset: 2px; opacity: 1; background: rgba(255,255,255,0.12); transform: translateY(-2px); }
+  #links a:focus-visible .ql-tip, .freq-item:focus-visible .ql-tip, .plug-item:focus-visible .ql-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
   /* row size variants (small = base); "off" hides via the hidden attr */
   #links[hidden] { display: none; }
   #frequent.size-medium, #plugin-bar.size-medium { gap: 1.0rem; }
@@ -803,6 +806,7 @@ input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeSuggest(); return; }
     if (e.key === "Enter" && sug.idx >= 0) { e.preventDefault(); chooseSuggest(sug.items[sug.idx]); return; }
   }
+  if (e.key === "ArrowDown" && !sug.open) { if (focusRowGrid(0, 0)) { e.preventDefault(); return; } }   // ↓ from the box → into the icon rows
   if ((e.key === "Tab" || e.key === "/") && S.siteHistory) {                        // step through a completed path one slash at a time
     const v = input.value, s = input.selectionStart;
     if (s < input.selectionEnd && input.selectionEnd === v.length && s > 0) {       // a completion suffix is selected
@@ -840,6 +844,27 @@ input.addEventListener("keydown", (e) => {
   if (S.smartUrl && looksLikeUrl(q)) return goUrl(q, false);
   goSearch();
 });
+
+/* ---- keyboard navigation of the icon rows: ↓ from the box steps into Quick links → Frequent → Plugins ----
+   ←/→ move within a row, ↑/↓ move between rows (↑ off the top returns to the box), ↵/space selects, esc returns. */
+function rowNavs() { return [$("links"), $("frequent"), $("plugin-bar")].filter(n => n && !n.hidden && n.children.length); }
+function focusRowGrid(rowIdx, col) {
+  const rows = rowNavs(); if (!rows.length) return false;
+  const items = rows[Math.max(0, Math.min(rows.length - 1, rowIdx))].children;
+  items[Math.max(0, Math.min(items.length - 1, col))].focus();
+  return true;
+}
+document.addEventListener("keydown", (e) => {
+  const a = document.activeElement, nav = a && a.closest && a.closest("#links,#frequent,#plugin-bar");
+  if (!nav || e.metaKey || e.ctrlKey || e.altKey) return;
+  const rows = rowNavs(), ri = rows.indexOf(nav), items = [...nav.children], col = items.indexOf(a);
+  if (e.key === "ArrowRight") { e.preventDefault(); (items[col + 1] || items[col]).focus(); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); (col > 0 ? items[col - 1] : items[0]).focus(); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); focusRowGrid(ri + 1, col); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); ri > 0 ? focusRowGrid(ri - 1, col) : input.focus(); }
+  else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); a.click(); }          // ↵/space selects (anchors navigate, plugins open)
+  else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); input.focus(); }   // esc returns to the box (before the global Esc)
+}, true);
 
 /* ---- suggestions dropdown: your visited sites + (opt-in) Google web suggestions ---- */
 const suggestEl = $("suggest");

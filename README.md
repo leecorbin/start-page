@@ -10,7 +10,8 @@ only download when you use them — a **calculator** with live graphs, a **colou
 lab, a **dictionary**, **image** and **map** search, a developer/text **tools**
 box, a little **arcade** (2048, Snake, Tetris), and animated **"living wallpapers"**
 (lava lamp, a weatherscape that matches your forecast, matrix rain). Every provider is **keyless** — no API keys, no
-backend, no Google.
+backend, no Google. It also sends **no referrer** (`<meta name="referrer" content="no-referrer">`), so sites you open
+from here see a direct visit rather than your start page's address.
 
 ![start-page running as a Safari new-tab page](screenshot.png)
 

@@ -101,9 +101,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         cfg.userContentController = ucc
         web = WKWebView(frame: NSRect(origin: .zero, size: kDefaultSize), configuration: cfg)
         web.navigationDelegate = self
-        web.load(URLRequest(url: launcherURL()))
+        web.load(startRequest())
     }
-    func reloadStart() { web.load(URLRequest(url: launcherURL())) }
+    // Always fetch the start page fresh — never a stale cached copy after you redeploy.
+    // (Subresources still cache normally; the plugins carry their own ?v= cache-buster.)
+    func startRequest() -> URLRequest { URLRequest(url: launcherURL(), cachePolicy: .reloadIgnoringLocalCacheData) }
+    func reloadStart() { web.load(startRequest()) }
 
     // ---- panel + browse toolbar, minimal chrome, remembered frame ----
     func buildPanel() {
@@ -254,13 +257,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if isStartPage(web.url) {
             web.evaluateJavaScript("window.__launcherHome && window.__launcherHome()", completionHandler: nil)  // clean slate
         } else {
-            web.load(URLRequest(url: launcherURL()))                    // browsed away → fresh start page
+            web.load(startRequest())                                    // browsed away → fresh start page
         }
     }
     func hide() { panel.orderOut(nil) }
     func focusSearch() { web.evaluateJavaScript("var q=document.getElementById('q'); if(q){q.focus(); q.select();}", completionHandler: nil) }
 
-    @objc func reloadPage() { reloadStart() }
+    @objc func reloadPage() { web.reloadFromOrigin() }                  // hard reload of whatever's showing (cold-reloads the start page too)
     @objc func quit() { NSApp.terminate(nil) }
 
     @objc func openSettings() {

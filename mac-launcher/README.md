@@ -14,13 +14,19 @@ settings window.
 - **⌥Space** (default) summons / dismisses the window from anywhere. The hotkey is
   configurable in Settings.
 - **Escape works like it does on the page — a step back:** from a search result it goes
-  back to the start page (query still in the box); on the start page it drops the
-  autocomplete / exits a plugin / clears the box; and once there's nothing left to clear,
-  it closes the window. Clicking on another app also hides it.
+  back to the start page **with your query still in the box** (the app stashes it and
+  re-injects it); on the start page it drops the autocomplete / exits a plugin / clears
+  the box / drops the bang chip; and once there's nothing left, it closes the window.
+  Clicking on another app also hides it.
+- **A fresh summon starts clean** — reopening the popup resets to an empty start page, so
+  every lookup begins fresh (Esc-back within a session is what keeps your query).
+- **Browse toolbar** — when a result opens *in the panel*, a slim back / forward / reload
+  strip appears at the top; on the start page there's no toolbar (minimal chrome).
 - **Menu-bar icon** (magnifying glass) — left-click toggles the window, right-click for a
   menu (Settings / Reload / Quit).
-- The window is **bigger than Spotlight, smaller than a Safari window**, minimal chrome,
-  and it **remembers its size and position**. The search box is focused on every open.
+- The window is **bigger than Spotlight, smaller than a Safari window**, minimal chrome
+  (close button only — no minimise or zoom), and it **remembers its size and position**.
+  The search box is focused on every open.
 
 ## Build & run
 

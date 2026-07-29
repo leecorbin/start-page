@@ -835,6 +835,7 @@ input.addEventListener("keydown", (e) => {
     updateMode(); closeSuggest();
     return;
   }
+  if (e.key === "Escape" && !sug.open && !input.value && activeBang) { e.preventDefault(); e.stopPropagation(); clearBang(); updateMode(); updateClear(); return; }   // Esc on an empty box backs out of the bang chip
   if (e.key === "Backspace" && activeBang && input.value === "") { e.preventDefault(); clearBang(); updateMode(); return; }
   if (e.key !== "Enter") return;
   e.preventDefault();
@@ -1990,20 +1991,40 @@ document.addEventListener("keydown", (e) => {              // Esc works even whe
   closePanel();
 });
 if (IS_LAUNCHER) {
-  // Inside the launcher: read state in the capture phase (before the other Esc
-  // handlers mutate it) — if there's genuinely nothing to clear, ask the app to
-  // close the popup; otherwise let the normal ladder (autocomplete → plugin →
-  // box) handle this Esc.
+  // Read state in the capture phase (before the other Esc handlers mutate it): if
+  // there's genuinely nothing left to clear (box empty, no chip, nothing open), ask
+  // the app to close; otherwise let the normal ladder (autocomplete → plugin → box
+  // text → bang chip) handle this Esc.
   window.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     const ae = document.activeElement;
-    const busy = input.value || sug.open || activePlugin || !$("help").hidden ||
+    const busy = input.value || activeBang || sug.open || activePlugin || !$("help").hidden ||
       panel.classList.contains("open") || (ae && ae.closest && ae.closest("#links,#frequent,#plugin-bar"));
     if (!busy) {
       e.preventDefault(); e.stopPropagation();
       window.webkit?.messageHandlers?.launcher?.postMessage("close");
     }
   }, true);
+  // Keep the app posted on the current query so Esc-back can put it back. (WebKit drops
+  // the box text on a back nav because the field is autocomplete="off"; the app storing
+  // it and re-injecting works whether or not the page comes from the back/forward cache.)
+  input.addEventListener("input", () => {
+    window.webkit?.messageHandlers?.launcher?.postMessage({ type: "q", text: input.value, bang: activeBang ? activeBang.keyword : "" });
+  });
+  window.__launcherRestore = (text, bang) => {   // app calls this after an Esc-back
+    if (bang && !activeBang) { const b = bangByKeyword(bang); if (b) setBang(b); }
+    input.value = text || "";
+    updateMode(); updateClear();
+    input.focus({ preventScroll: true }); if (input.select) input.select();
+  };
+  window.__launcherHome = () => {                 // app calls this on a fresh summon → clean slate
+    if (activePlugin) closePlugin();
+    if (!$("help").hidden) closeHelp();
+    closePanel(); closeSuggest(); clearBang();
+    input.value = "";
+    updateMode(); updateClear();
+    input.focus({ preventScroll: true });
+  };
 }
 document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) closePanel(); });
 document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });

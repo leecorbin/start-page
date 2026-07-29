@@ -38,7 +38,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
+        .frame(width: 420, height: 440)   // explicit size so NSHostingController sizes the window (else it collapses)
     }
 }
 

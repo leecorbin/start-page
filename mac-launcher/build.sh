@@ -9,10 +9,10 @@ BIN="$APP/Contents/MacOS/StartLauncher"
 echo "Compiling…"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS"
-swiftc -O -swift-version 5 \
-    -framework Cocoa -framework WebKit -framework Carbon \
+swiftc -O -swift-version 5 -target arm64-apple-macos14.0 \
+    -framework Cocoa -framework WebKit -framework SwiftUI -framework Carbon -framework ServiceManagement \
     -o "$BIN" \
-    Sources/StartLauncher/main.swift
+    Sources/StartLauncher/*.swift
 
 cp Info.plist "$APP/Contents/Info.plist"
 

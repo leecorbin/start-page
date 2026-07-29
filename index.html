@@ -945,6 +945,11 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
    so browsers fetch the new code instead of a hard-cached ES module. */
 const APP_VERSION = "2026.06.15c";
 
+/* True when opened inside the mac quick-launcher (it loads us with ?launcher=1).
+   A hook for launcher-aware behaviour — currently: Esc closes the popup once
+   there's nothing left to clear. No effect in a normal browser. */
+const IS_LAUNCHER = new URLSearchParams(location.search).has("launcher");
+
 /* ---- plugin host: lazy-loaded omnibox plugins ----
    Type a trigger (e.g. "==") and the omnibox slides open into that plugin.
    The registry below holds what's needed BEFORE load (trigger, chip, height);
@@ -1984,6 +1989,22 @@ document.addEventListener("keydown", (e) => {              // Esc works even whe
   if (activePlugin) { closePlugin(); return; }
   closePanel();
 });
+if (IS_LAUNCHER) {
+  // Inside the launcher: read state in the capture phase (before the other Esc
+  // handlers mutate it) — if there's genuinely nothing to clear, ask the app to
+  // close the popup; otherwise let the normal ladder (autocomplete → plugin →
+  // box) handle this Esc.
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const ae = document.activeElement;
+    const busy = input.value || sug.open || activePlugin || !$("help").hidden ||
+      panel.classList.contains("open") || (ae && ae.closest && ae.closest("#links,#frequent,#plugin-bar"));
+    if (!busy) {
+      e.preventDefault(); e.stopPropagation();
+      window.webkit?.messageHandlers?.launcher?.postMessage("close");
+    }
+  }, true);
+}
 document.addEventListener("click", (e) => { if (panel.classList.contains("open") && !panel.contains(e.target) && !$("controls").contains(e.target) && !$("tune-pop").contains(e.target)) closePanel(); });
 document.addEventListener("visibilitychange", () => { document.hidden ? clearInterval(clockTimer) : startClock(); });
 

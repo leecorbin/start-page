@@ -30,19 +30,50 @@ final class KeyPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
-// Container: an optional slim toolbar strip on top (shown while browsing), the web view below.
+// Container: a slim toolbar strip on top (shown while browsing) that slides in/out, the web view below.
 final class RootView: NSView {
-    var webView: NSView?
     let strip = NSVisualEffectView()
+    let web: WKWebView
     let stripHeight: CGFloat = 38
-    var showStrip = false { didSet { if showStrip != oldValue { strip.isHidden = !showStrip; needsLayout = true } } }
+    private var heightC: NSLayoutConstraint!
+    private var shown = false
 
-    override func layout() {
-        super.layout()
-        let w = bounds.width, h = bounds.height
-        let s = showStrip ? stripHeight : 0
-        strip.frame = NSRect(x: 0, y: h - s, width: w, height: s)          // top
-        webView?.frame = NSRect(x: 0, y: 0, width: w, height: h - s)       // fills the rest
+    init(web: WKWebView, toolbar: NSView) {
+        self.web = web
+        super.init(frame: .zero)
+        strip.material = .headerView
+        strip.blendingMode = .withinWindow
+        strip.isHidden = true
+        for v in [strip, web, toolbar] { v.translatesAutoresizingMaskIntoConstraints = false }
+        strip.addSubview(toolbar)
+        addSubview(web); addSubview(strip)
+        heightC = strip.heightAnchor.constraint(equalToConstant: 0)
+        NSLayoutConstraint.activate([
+            strip.topAnchor.constraint(equalTo: topAnchor),
+            strip.leadingAnchor.constraint(equalTo: leadingAnchor),
+            strip.trailingAnchor.constraint(equalTo: trailingAnchor),
+            heightC,
+            web.topAnchor.constraint(equalTo: strip.bottomAnchor),
+            web.leadingAnchor.constraint(equalTo: leadingAnchor),
+            web.trailingAnchor.constraint(equalTo: trailingAnchor),
+            web.bottomAnchor.constraint(equalTo: bottomAnchor),
+            toolbar.leadingAnchor.constraint(equalTo: strip.leadingAnchor, constant: 82),   // clear of the traffic lights
+            toolbar.centerYAnchor.constraint(equalTo: strip.centerYAnchor),
+        ])
+    }
+    required init?(coder: NSCoder) { fatalError("no coder") }
+
+    func setStrip(_ show: Bool) {
+        guard show != shown else { return }
+        shown = show
+        if show { strip.isHidden = false }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.2
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            ctx.allowsImplicitAnimation = true
+            self.heightC.constant = show ? self.stripHeight : 0
+            self.layoutSubtreeIfNeeded()
+        }, completionHandler: { if !show { self.strip.isHidden = true } })
     }
 }
 
@@ -110,18 +141,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
 
     // ---- panel + browse toolbar, minimal chrome, remembered frame ----
     func buildPanel() {
-        backBtn = toolBtn("chevron.left", #selector(goBack));    backBtn.frame = NSRect(x: 84, y: 8, width: 22, height: 22)
-        fwdBtn  = toolBtn("chevron.right", #selector(goForward)); fwdBtn.frame  = NSRect(x: 112, y: 8, width: 22, height: 22)
-        let reloadBtn = toolBtn("arrow.clockwise", #selector(reloadPage)); reloadBtn.frame = NSRect(x: 146, y: 8, width: 22, height: 22)
-
-        root = RootView(frame: NSRect(origin: .zero, size: kDefaultSize))
-        root.strip.material = .headerView
-        root.strip.blendingMode = .withinWindow
-        root.strip.isHidden = true
-        [backBtn, fwdBtn, reloadBtn].forEach { root.strip.addSubview($0) }
-        root.webView = web
-        root.addSubview(web)
-        root.addSubview(root.strip)
+        backBtn = toolBtn("chevron.left", #selector(goBack))
+        fwdBtn  = toolBtn("chevron.right", #selector(goForward))
+        let reloadBtn = toolBtn("arrow.clockwise", #selector(reloadPage))
+        for b in [backBtn!, fwdBtn!, reloadBtn] {
+            b.translatesAutoresizingMaskIntoConstraints = false
+            b.widthAnchor.constraint(equalToConstant: 22).isActive = true
+            b.heightAnchor.constraint(equalToConstant: 22).isActive = true
+        }
+        let toolbar = NSStackView(views: [backBtn, fwdBtn, reloadBtn])
+        toolbar.orientation = .horizontal
+        toolbar.spacing = 8
+        root = RootView(web: web, toolbar: toolbar)
 
         panel = KeyPanel(contentRect: NSRect(origin: .zero, size: kDefaultSize),
                          styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
@@ -153,7 +184,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     @objc func goBack() { if web.canGoBack { web.goBack() } }
     @objc func goForward() { if web.canGoForward { web.goForward() } }
     func updateChrome() {
-        root.showStrip = !isStartPage(web.url)                          // toolbar only while browsing
+        root.setStrip(!isStartPage(web.url))                            // toolbar slides in only while browsing
         backBtn.isEnabled = web.canGoBack
         fwdBtn.isEnabled = web.canGoForward
     }
@@ -187,6 +218,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func installEscapeMonitor() {
         escMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] ev in
             guard let self = self, self.panel.isKeyWindow, ev.keyCode == 53 else { return ev }
+            if ev.modifierFlags.contains(.command) { self.hide(); return nil }   // ⌘Esc → dismiss immediately
             if self.isStartPage(self.web.url) { return ev }
             if let item = self.startPageBackItem() {
                 self.pendingRestore = true                       // put the query back once we're home

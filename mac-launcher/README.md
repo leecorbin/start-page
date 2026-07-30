@@ -17,11 +17,11 @@ settings window.
   back to the start page **with your query still in the box** (the app stashes it and
   re-injects it); on the start page it drops the autocomplete / exits a plugin / clears
   the box / drops the bang chip; and once there's nothing left, it closes the window.
-  Clicking on another app also hides it.
+  Clicking on another app also hides it. **⌘Esc** dismisses immediately from anywhere.
 - **A fresh summon starts clean** — reopening the popup resets to an empty start page, so
   every lookup begins fresh (Esc-back within a session is what keeps your query).
 - **Browse toolbar** — when a result opens *in the panel*, a slim back / forward / reload
-  strip appears at the top; on the start page there's no toolbar (minimal chrome).
+  strip **slides in** at the top; on the start page there's no toolbar (minimal chrome).
 - **Menu-bar icon** (magnifying glass) — left-click toggles the window, right-click for a
   menu (Settings / Reload / Quit).
 - The window is **bigger than Spotlight, smaller than a Safari window**, minimal chrome

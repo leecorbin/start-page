@@ -1630,7 +1630,9 @@ function bookmarkletHref() {                                       // runs on th
 /* ============ cloud sync — end-to-end encrypted, optional (Cloudflare Worker backend) ============
    The server only ever stores ciphertext under a hash-derived id; your sync code is the key and
    never leaves the device. Last-write-wins with a revision check (not a field merge). */
-const SYNC_API = localStorage.getItem("startpage:syncApi") || "https://api.corbin.uk/api";   // override for testing
+// Default endpoint. Currently the workers.dev URL so browser + launcher work without a console
+// override; switch to your custom subdomain (e.g. https://api.<brand>.uk/api) once it's routed.
+const SYNC_API = localStorage.getItem("startpage:syncApi") || "https://startpage-sync.leecorbin.workers.dev/api";
 const K_SYNC = "startpage:sync";                                     // device-local config — never itself synced
 
 const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

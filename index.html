@@ -275,6 +275,22 @@
   .modal-card .row.col { flex-direction: column; align-items: stretch; gap: 0.35rem; }
   .modal-card select, .modal-card input[type="text"] { background: rgba(255,255,255,0.08); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.88rem; padding: 0.4rem 0.5rem; }
   .modal-card .dim { color: var(--muted); }
+  .minibtn.accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .minibtn.accent:hover { filter: brightness(1.08); background: var(--accent); }
+  .iconbtn { display: grid; place-items: center; width: 30px; height: 30px; flex: none; padding: 0; background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); cursor: pointer; }
+  .iconbtn:hover { background: rgba(255,255,255,0.18); }
+  .iconbtn svg { width: 16px; height: 16px; }
+  .sync-sec { margin: 0.3rem 0; }
+  .sync-sec > label.h { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.4rem; }
+  .sy-codewrap { display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0 0.5rem; }
+  .sy-codewrap input { flex: 1; min-width: 0; }
+  .sync-or { display: flex; align-items: center; color: var(--muted); font-size: 0.76rem; margin: 0.9rem 0; }
+  .sync-or::before, .sync-or::after { content: ""; flex: 1; height: 1px; background: var(--field-border); }
+  .sync-or span { padding: 0 0.7rem; }
+  .sync-chip .iconbtn { width: 24px; height: 24px; margin-left: auto; }
+  .sync-chip .iconbtn svg { width: 14px; height: 14px; }
+  #toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(12px); background: rgba(18,22,30,0.97); color: #fff; border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 0.5rem 0.95rem; font-size: 0.85rem; box-shadow: 0 12px 34px rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; z-index: 30; max-width: 90vw; text-align: center; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .minibtn:hover { background: rgba(255,255,255,0.18); }
   .minibtn:disabled { opacity: 0.4; cursor: not-allowed; }
   .minibtn:disabled:hover { background: rgba(255,255,255,0.10); }
@@ -506,7 +522,7 @@
         <button class="minibtn" id="sync-setup" style="width:100%;">Set up sync…</button>
       </div>
       <div id="sync-on" hidden>
-        <div class="sync-chip"><span class="sync-dot"></span><code id="sync-code"></code><span id="sync-status" class="dim"></span></div>
+        <div class="sync-chip"><span class="sync-dot"></span><code id="sync-code"></code><button class="iconbtn sync-copy" id="sync-copy" title="Copy code" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
         <div class="row" style="gap:0.4rem;margin-top:0.5rem;">
           <button class="minibtn" id="sync-now" style="flex:1;">Sync now</button>
           <button class="minibtn" id="sync-stop" style="flex:1;">Stop</button>
@@ -1639,10 +1655,12 @@ const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").
 function unb64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); }
 const utf8 = (s) => new TextEncoder().encode(s);
 async function sha256(str) { return new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(str))); }
-async function syncId(code) { return b64u(await sha256("id|" + code)).slice(0, 43); }          // lookup id — reveals nothing about the code
+const normCode = (c) => (c || "").trim().toLowerCase().replace(/[\s-]+/g, "");    // format/case/space-insensitive, so a pasted code always matches
+async function syncId(code) { return b64u(await sha256("id|" + normCode(code))).slice(0, 43); }   // lookup id — reveals nothing about the code
 async function syncKey(code) {
-  const base = await crypto.subtle.importKey("raw", utf8(code), "PBKDF2", false, ["deriveKey"]);
-  const salt = await sha256("salt|" + code);                        // per-code salt, derived (needs no storage; salt isn't secret)
+  const c = normCode(code);
+  const base = await crypto.subtle.importKey("raw", utf8(c), "PBKDF2", false, ["deriveKey"]);
+  const salt = await sha256("salt|" + c);                           // per-code salt, derived (needs no storage; salt isn't secret)
   return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 300000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
 }
 async function syncEnc(key, obj) {
@@ -1659,6 +1677,13 @@ function syncGenCode() {                                             // strong d
   for (const x of b) s += A[x & 31] + A[(x >> 5) & 31];
   return s.slice(0, 16).replace(/(.{4})(?=.)/g, "$1-");
 }
+// cosmetic: hyphenate a code-style string in 4s (leaves a spaced passphrase alone)
+function formatCode(v) { if (/\s/.test(v)) return v; const s = v.replace(/-/g, ""); return (/^[a-z0-9]+$/i.test(s) && s.length <= 24) ? s.replace(/(.{4})(?=.)/g, "$1-") : v; }
+// a small transient toast, plus a robust clipboard copy (with a fallback)
+function toast(msg, ms) { let t = document.getElementById("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); } t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), ms || 2600); }
+async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch { try { const a = document.createElement("textarea"); a.value = t; a.style.cssText = "position:fixed;opacity:0"; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); return true; } catch { return false; } } }
+const SVG_DICE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor" stroke="none"/></svg>`;
+const SVG_COPY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`;
 
 const syncCfg = () => readLS(K_SYNC);
 const syncSaveCfg = (c) => writeLS(K_SYNC, c);
@@ -1684,25 +1709,25 @@ async function syncPush(firstTime) {
     const id = await syncId(c.code), key = await syncKey(c.code);
     let res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c.scope)), baseRev: c.rev || 0, ttl: c.ttl || 0 });
     if (res.status === 409) {
-      if (firstTime) { syncClearCfg(); syncRenderGroup(); alert("That code is already in use. Use “Connect ↓” to join it, or generate a different code."); return; }
-      await syncPull(true);                                         // someone else pushed → adopt theirs, then re-push our change
-      const c2 = syncCfg(); if (!c2) return;
-      res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c2.scope)), baseRev: c2.rev || 0, ttl: c2.ttl || 0 });
+      if (firstTime) { syncClearCfg(); syncRenderGroup(); alert("That code is already in use. Use “Connect” below to join it, or generate a different code."); return; }
+      const cur = await syncGET("/sync/" + id + "/rev");            // stale → take the server's rev and re-push (your latest change wins)
+      if (cur.gone) return syncStopped("removed");
+      res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c.scope)), baseRev: cur.rev, ttl: c.ttl || 0 });
     }
     if (!res.ok) throw new Error("push " + res.status);
     syncSaveCfg({ ...syncCfg(), rev: (await res.json()).rev });
-    syncUpdateUI("Synced ✓");
-  } catch { syncUpdateUI("Sync failed"); }
+    syncRenderGroup();
+    toast(firstTime ? "Sync created ✓ — add other devices with your code" : "Synced ✓");
+  } catch { toast("Sync failed — will retry"); }
   finally { syncBusy = false; }
 }
-async function syncPull(inner) {
+async function syncPull() {
   const c = syncCfg(); if (!c) return false;
   const data = await syncGET("/sync/" + (await syncId(c.code)));
   if (data.gone) { syncStopped("removed"); return false; }
-  let blob; try { blob = await syncDec(await syncKey(c.code), data.ciphertext); } catch { syncUpdateUI("Wrong code?"); return false; }
+  let blob; try { blob = await syncDec(await syncKey(c.code), data.ciphertext); } catch { toast("Couldn't read that sync — wrong code?"); return false; }
   syncApplyBlob(blob);
   syncSaveCfg({ ...c, rev: data.rev, scope: blob.hist ? "all" : c.scope });
-  if (!inner) syncUpdateUI("Restored ✓");
   return true;
 }
 async function syncRevCheck() {                                     // on load / focus: pull only if the server is newer
@@ -1710,60 +1735,76 @@ async function syncRevCheck() {                                     // on load /
   try {
     const r = await syncGET("/sync/" + (await syncId(c.code)) + "/rev");
     if (r.gone) return syncStopped("removed");
-    if ((r.rev || 0) > (c.rev || 0)) { if (await syncPull()) location.reload(); }
+    if ((r.rev || 0) > (c.rev || 0) && await syncPull()) { sessionStorage.setItem("startpage:toast", "Updated from another device ✓"); location.reload(); }
   } catch {}
 }
 async function syncDeleteRemote() { const c = syncCfg(); if (!c) return; try { await fetch(SYNC_API + "/sync/" + (await syncId(c.code)), { method: "DELETE" }); } catch {} }
 function syncStopped(reason) {
   syncClearCfg(); syncRenderGroup();
-  if (reason === "removed") alert("This sync was removed (deleted or expired elsewhere). Your settings are unchanged — set up a new sync to start again.");
+  if (reason === "removed") toast("This sync was removed elsewhere — your settings are unchanged. Set up a new one to start again.", 5000);
 }
 let syncPushTimer = null;
 function syncOnChange() { if (!syncCfg()) return; clearTimeout(syncPushTimer); syncPushTimer = setTimeout(() => syncPush(), 1500); }
+let syncFocusTimer = null;
+function syncFocusCheck() { if (!syncCfg()) return; clearTimeout(syncFocusTimer); syncFocusTimer = setTimeout(syncRevCheck, 500); }   // returning to the page → check for updates
+function syncPendingToast() { const m = sessionStorage.getItem("startpage:toast"); if (m) { sessionStorage.removeItem("startpage:toast"); setTimeout(() => toast(m), 350); } }
 
 function syncRenderGroup() {
   const c = syncCfg(), off = $("sync-off"), on = $("sync-on"); if (!off || !on) return;
   off.hidden = !!c; on.hidden = !c;
-  if (c) { $("sync-code").textContent = c.code; $("sync-status").textContent = ""; }
+  if (c) $("sync-code").textContent = c.code;
 }
-function syncUpdateUI(status) { syncRenderGroup(); const s = $("sync-status"); if (s && status) s.textContent = "· " + status; }
 
 function syncOpenSetup() {
   const overlay = document.createElement("div"); overlay.className = "modal";
   const card = document.createElement("div"); card.className = "modal-card"; overlay.appendChild(card);
   card.innerHTML =
     `<h2 style="margin:0 0 0.3rem;font-size:1.05rem;font-weight:500">Set up sync</h2>
-     <p class="grp-note">Sync your settings across devices — <strong>end-to-end encrypted</strong>. Your code is the key: only devices with it can read your settings, and it never leaves your device. Keep it safe.</p>
-     <div class="row col"><label class="dim" style="font-size:0.76rem">Sync code</label>
-       <div style="display:flex;gap:0.4rem;align-items:center"><input type="text" id="sy-code" style="flex:1" spellcheck="false" autocapitalize="off" autocorrect="off">
-         <button class="minibtn" id="sy-gen" title="Generate a strong code">🎲</button><button class="minibtn" id="sy-copy">Copy</button></div></div>
-     <div class="row"><span>Keep for</span><select id="sy-ttl"><option value="0">Until I remove it</option><option value="86400">24 hours</option><option value="3600">1 hour</option></select></div>
-     <div class="row"><span>Include</span><select id="sy-scope"><option value="settings">Settings</option><option value="all">Everything (incl. history)</option></select></div>
-     <p class="grp-note" style="margin-top:0.4rem"><strong>Create ↑</strong> pushes this device's settings up under the code. <strong>Connect ↓</strong> pulls an existing code's settings down onto this device.</p>
-     <div class="imp-row"><button class="minibtn" id="sy-cancel">Cancel</button><button class="minibtn" id="sy-connect">Connect ↓</button>
-       <button class="minibtn" id="sy-create" style="background:var(--accent);border-color:var(--accent);color:#fff">Create ↑</button></div>`;
+     <p class="grp-note">End-to-end encrypted — your code is the key and never leaves your device. Anyone with it can read your settings, so keep it safe.</p>
+     <div class="sync-sec">
+       <label class="h">Create a new sync</label>
+       <p class="grp-note">Push this device's settings up under a fresh code.</p>
+       <div class="sy-codewrap"><input type="text" id="sy-code" spellcheck="false" autocapitalize="off" autocorrect="off">
+         <button class="iconbtn" id="sy-gen" title="Generate a new code" aria-label="Generate">${SVG_DICE}</button>
+         <button class="iconbtn" id="sy-copy" title="Copy code" aria-label="Copy">${SVG_COPY}</button></div>
+       <div class="row"><span>Keep for</span><select id="sy-ttl"><option value="0">Until I remove it</option><option value="86400">24 hours</option><option value="3600">1 hour</option></select></div>
+       <div class="row"><span>Include</span><select id="sy-scope"><option value="settings">Settings</option><option value="all">Everything (incl. history)</option></select></div>
+       <button class="minibtn accent" id="sy-create" style="width:100%">Create sync ↑</button>
+     </div>
+     <div class="sync-or"><span>or</span></div>
+     <div class="sync-sec">
+       <label class="h">Connect an existing sync</label>
+       <p class="grp-note">Paste a code from another device to pull its settings here.</p>
+       <input type="text" id="sy-existing" placeholder="paste your code" style="width:100%" spellcheck="false" autocapitalize="off" autocorrect="off">
+       <button class="minibtn" id="sy-connect" style="width:100%;margin-top:0.5rem">Connect ↓</button>
+     </div>
+     <div class="imp-row"><button class="minibtn" id="sy-cancel">Cancel</button></div>`;
   document.body.appendChild(overlay);
   const code = $("sy-code"); code.value = syncGenCode();
   const close = () => overlay.remove();
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
   $("sy-cancel").onclick = close;
   $("sy-gen").onclick = () => { code.value = syncGenCode(); };
-  $("sy-copy").onclick = () => { try { navigator.clipboard.writeText(code.value); $("sy-copy").textContent = "Copied ✓"; setTimeout(() => ($("sy-copy").textContent = "Copy"), 1500); } catch {} };
+  $("sy-copy").onclick = async () => { toast(await copyText(code.value) ? "Code copied ✓" : "Copy failed"); };
+  $("sy-existing").addEventListener("input", (e) => { e.target.value = formatCode(e.target.value); });
   $("sy-create").onclick = async () => {
-    const c = code.value.trim(); if (c.length < 6) return alert("That code is too short.");
-    syncSaveCfg({ code: c, scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
+    if (normCode(code.value).length < 6) return alert("That code is too short.");
+    syncSaveCfg({ code: code.value.trim(), scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
     close(); syncRenderGroup(); await syncPush(true);
   };
   $("sy-connect").onclick = async () => {
-    const c = code.value.trim(); if (c.length < 6) return alert("Enter your existing code.");
-    syncSaveCfg({ code: c, scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
-    syncRenderGroup(); const ok = await syncPull(); close(); if (ok) location.reload();
+    const ex = $("sy-existing").value.trim();
+    if (normCode(ex).length < 6) return alert("Enter the code from your other device.");
+    syncSaveCfg({ code: ex, scope: "settings", ttl: 0, rev: 0 });   // scope/ttl come from the blob on pull
+    const ok = await syncPull(); close();
+    if (ok) { sessionStorage.setItem("startpage:toast", "Settings synced from your code ✓"); location.reload(); }
+    else syncClearCfg();
   };
 }
 function syncStop() {
   if (!confirm("Stop syncing on this device? Your settings stay put.")) return;
   if (confirm("Also delete this sync from the server? That removes it for every device using this code.")) syncDeleteRemote();
-  syncClearCfg(); syncRenderGroup();
+  syncClearCfg(); syncRenderGroup(); toast("Sync stopped");
 }
 
 /* ============================ weather ============================ */
@@ -2120,6 +2161,7 @@ function bindControls() {
   $("sync-setup").onclick = syncOpenSetup;
   $("sync-now").onclick = () => syncPush();
   $("sync-stop").onclick = syncStop;
+  $("sync-copy").onclick = async () => { const c = syncCfg(); if (c) toast(await copyText(c.code) ? "Code copied ✓" : "Copy failed"); };
   syncRenderGroup();
 
   $("s-showSearch").onchange = () => { S.showSearch = $("s-showSearch").checked; save(); applySearch(); };
@@ -2215,7 +2257,10 @@ renderLinks();
 loadWeather();
 bindControls();
 handleShareHash();                                          // a shared "#import=" / bookmarklet link → offer to add the searches
+syncPendingToast();                                         // show a toast queued before a sync-triggered reload
 syncRevCheck();                                             // if a newer copy is on the server, pull it (then reload once)
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncFocusCheck(); });   // returning to the tab → auto-pull
+window.addEventListener("focus", syncFocusCheck);
 window.addEventListener("pageshow", assertFocus);
 /* Refocus the box when returning to this tab/window — but never steal focus
    from another field (e.g. a settings input) the user was working in. */

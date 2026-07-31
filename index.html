@@ -291,29 +291,32 @@
   .sync-chip .iconbtn svg { width: 14px; height: 14px; }
   #toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(12px); background: rgba(18,22,30,0.97); color: #fff; border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 0.5rem 0.95rem; font-size: 0.85rem; box-shadow: 0 12px 34px rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; z-index: 30; max-width: 90vw; text-align: center; }
   #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  /* compact list rows for quick links / custom searches (add & edit via a modal) */
+  .sc-row { display: flex; align-items: center; gap: 0.55rem; padding: 0.4rem 0.45rem; border-radius: 9px; cursor: pointer; transition: background 0.12s ease; }
+  .sc-row:hover, .sc-row:focus-visible { background: rgba(255,255,255,0.06); outline: none; }
+  .sc-ic { width: 26px; height: 26px; flex: none; display: grid; place-items: center; }
+  .sc-ic img { width: 20px; height: 20px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.9; }
+  .sc-ic .ql-mono { width: 22px; height: 22px; font-size: 11px; }
+  .sc-ic .ql-glyph { font-size: 20px; }
+  .sc-label { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+  .sc-name { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-name code { background: rgba(91,155,255,0.22); border: 1px solid rgba(91,155,255,0.4); border-radius: 5px; padding: 0 0.3rem; font-size: 0.8em; margin-right: 0.35rem; }
+  .sc-sub { font-size: 0.72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-ctrls { display: flex; gap: 0.05rem; flex: none; }
+  .sc-ctrls button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0.2rem 0.3rem; border-radius: 6px; }
+  .sc-ctrls button:hover { color: var(--fg); background: rgba(255,255,255,0.1); }
+  .sc-ctrls button:disabled { opacity: 0.25; cursor: default; }
+  .sc-ctrls .sc-x:hover { color: #ff9a9a; background: rgba(255,80,80,0.15); }
+  .minibtn.sc-del { color: #ffb3b3; border-color: rgba(255,80,80,0.3); background: rgba(255,80,80,0.12); }
+  .minibtn.sc-del:hover { color: #fff; background: rgba(255,80,80,0.24); }
+  .modal-card .row.col label { font-size: 0.76rem; }
+  .modal-card .row.col label code { font-size: 0.9em; }
   .minibtn:hover { background: rgba(255,255,255,0.18); }
   .minibtn:disabled { opacity: 0.4; cursor: not-allowed; }
   .minibtn:disabled:hover { background: rgba(255,255,255,0.10); }
   #wx-status { font-size: 0.78rem; color: var(--muted); min-height: 1em; }
 
-  /* link editor */
-  .lcard { background: rgba(255,255,255,0.05); border: 1px solid var(--field-border); border-radius: 9px; padding: 0.45rem 0.5rem; margin-bottom: 0.5rem; }
-  .lcard-top { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem; }
-  .lcard-bot { display: flex; align-items: center; gap: 0.5rem; }
-  .lprev { width: 26px; height: 26px; flex: none; display: grid; place-items: center; }
-  .lprev img { width: 18px; height: 18px; filter: grayscale(1) brightness(0) invert(1); opacity: 0.85; }
-  .lprev .ql-mono { width: 22px; height: 22px; font-size: 11px; }
-  .lcard input.ltitle { flex: 1; min-width: 0; }
-  .lcard input.lurl { flex: 1; min-width: 0; font-size: 0.8rem; }
-  .lcard input.lkw { width: 60px; flex: none; }
-  .lcard input.licon { width: 50px; flex: none; text-align: center; font-size: 0.95rem; }
   .grp-note { font-size: 0.72rem; color: var(--muted); margin: 0 0 0.6rem; line-height: 1.5; }
-  .ldel { margin-left: auto; background: none; border: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0 0.2rem; }
-  .ldel:hover { color: #ff9a9a; }
-  .lmove { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.95rem; line-height: 1; padding: 0 0.12rem; }
-  .lmove:hover { color: #fff; }
-  .lmove:disabled { opacity: 0.25; cursor: default; }
-  .lmono { display: flex; align-items: center; gap: 0.25rem; font-size: 0.72rem; color: var(--muted); cursor: pointer; flex: none; white-space: nowrap; }
   .reset { margin-top: 0.5rem; width: 100%; background: rgba(255,80,80,0.14); border: 1px solid rgba(255,80,80,0.3); color: #ffb3b3; border-radius: 8px; padding: 0.5rem; font: inherit; font-size: 0.85rem; cursor: pointer; }
   .reset:hover { background: rgba(255,80,80,0.22); }
   .hidden { display: none !important; }
@@ -1984,61 +1987,87 @@ function syncDataWhen() {
 }
 function wxStatus(t) { $("wx-status").textContent = t || ""; }
 
-function renderLinkEditor() {
-  const wrap = $("link-editor"); wrap.innerHTML = "";
-  const links = S.links || [];
-  links.forEach((l, idx) => {
-    const card = document.createElement("div"); card.className = "lcard";
-    const top = document.createElement("div"); top.className = "lcard-top";
-    const prev = document.createElement("span"); prev.className = "lprev"; prev.appendChild(makeGlyph(l));
-    const title = document.createElement("input"); title.type = "text"; title.className = "ltitle"; title.placeholder = "Title"; title.value = l.title || "";
-    const up = document.createElement("button"); up.className = "lmove"; up.textContent = "↑"; up.title = "Move up"; up.disabled = idx === 0;
-    const down = document.createElement("button"); down.className = "lmove"; down.textContent = "↓"; down.title = "Move down"; down.disabled = idx === links.length - 1;
-    const del = document.createElement("button"); del.className = "ldel"; del.textContent = "×"; del.title = "Remove";
-    top.append(prev, title, up, down, del);
-    const bot = document.createElement("div"); bot.className = "lcard-bot";
-    const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "example.com"; url.value = l.url || "";
-    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = l.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides the brand icon)";
-    bot.append(url, icon);
-    card.append(top, bot);
-
-    const refreshPrev = () => { const g = makeGlyph(S.links[idx]); prev.innerHTML = ""; prev.appendChild(g); };
-    title.oninput = () => { S.links[idx].title = title.value; save(); renderLinks(); };
-    url.oninput = () => { S.links[idx].url = url.value; save(); renderLinks(); refreshPrev(); };
-    icon.oninput = () => { S.links[idx].icon = icon.value.trim(); save(); renderLinks(); refreshPrev(); };
-    const move = (to) => { const t = S.links[idx]; S.links.splice(idx, 1); S.links.splice(to, 0, t); save(); renderLinks(); renderLinkEditor(); };
-    up.onclick = () => move(idx - 1);
-    down.onclick = () => move(idx + 1);
-    del.onclick = () => { S.links.splice(idx, 1); save(); renderLinks(); renderLinkEditor(); };
-
-    wrap.appendChild(card);
-  });
+/* Quick links & custom searches are edited as a compact list; a modal handles add/edit
+   (clearer than the old inline input rows, and consistent with the sync modal). */
+function scBtn(txt, title) { const b = document.createElement("button"); b.type = "button"; b.textContent = txt; b.title = title; return b; }
+function scMoveLink(from, to) { const a = S.links, t = a[from]; a.splice(from, 1); a.splice(to, 0, t); save(); renderLinks(); renderLinkEditor(); }
+function scRow(kind, item, idx, total) {
+  const isLink = kind === "link";
+  const row = document.createElement("div"); row.className = "sc-row"; row.tabIndex = 0;
+  const ic = document.createElement("span"); ic.className = "sc-ic"; ic.appendChild(makeGlyph(item));
+  const label = document.createElement("div"); label.className = "sc-label";
+  const name = document.createElement("span"); name.className = "sc-name";
+  const sub = document.createElement("span"); sub.className = "sc-sub";
+  if (isLink) { name.textContent = item.title || hostOf(item.url) || "Untitled"; sub.textContent = hostOf(item.url) || item.url || ""; }
+  else { const code = document.createElement("code"); code.textContent = item.keyword || "?"; name.append(code, document.createTextNode(item.name || "")); sub.textContent = hostOf(item.url) || item.url || ""; }
+  label.append(name, sub);
+  const ctrls = document.createElement("div"); ctrls.className = "sc-ctrls";
+  if (isLink) {
+    const up = scBtn("↑", "Move up"); up.disabled = idx === 0; up.onclick = (e) => { e.stopPropagation(); scMoveLink(idx, idx - 1); };
+    const dn = scBtn("↓", "Move down"); dn.disabled = idx === total - 1; dn.onclick = (e) => { e.stopPropagation(); scMoveLink(idx, idx + 1); };
+    ctrls.append(up, dn);
+  }
+  const del = scBtn("×", "Remove"); del.className = "sc-x"; del.onclick = (e) => { e.stopPropagation(); (isLink ? S.links : S.bangs).splice(idx, 1); save(); if (isLink) renderLinks(); (isLink ? renderLinkEditor : renderBangEditor)(); };
+  ctrls.append(del);
+  row.append(ic, label, ctrls);
+  const open = () => openItemModal(kind, idx);
+  row.onclick = open; row.onkeydown = (e) => { if (e.key === "Enter") open(); };
+  return row;
 }
+function scList(wrapId, arr, kind, empty) {
+  const wrap = $(wrapId); if (!wrap) return; wrap.innerHTML = "";
+  if (!arr.length) { const p = document.createElement("p"); p.className = "grp-note"; p.style.margin = "0.2rem 0 0.3rem"; p.textContent = empty; wrap.appendChild(p); return; }
+  arr.forEach((it, i) => wrap.appendChild(scRow(kind, it, i, arr.length)));
+}
+function renderLinkEditor() { scList("link-editor", S.links || [], "link", "No quick links yet."); }
+function renderBangEditor() { scList("bang-editor", S.bangs || [], "search", "No custom searches yet."); }
+function scAfterEdit(kind) { if (kind === "link") { renderLinks(); renderLinkEditor(); } else renderBangEditor(); }
 
-function renderBangEditor() {
-  const wrap = $("bang-editor"); if (!wrap) return; wrap.innerHTML = "";
-  const bangs = S.bangs || [];
-  bangs.forEach((b, idx) => {
-    const card = document.createElement("div"); card.className = "lcard";
-    const top = document.createElement("div"); top.className = "lcard-top";
-    const prev = document.createElement("span"); prev.className = "lprev"; prev.appendChild(makeGlyph(b));
-    const kw = document.createElement("input"); kw.type = "text"; kw.className = "lkw"; kw.placeholder = "key"; kw.value = b.keyword || "";
-    const name = document.createElement("input"); name.type = "text"; name.className = "ltitle"; name.placeholder = "Name"; name.value = b.name || "";
-    const del = document.createElement("button"); del.className = "ldel"; del.textContent = "×"; del.title = "Remove";
-    top.append(prev, kw, name, del);
-    const bot = document.createElement("div"); bot.className = "lcard-bot";
-    const url = document.createElement("input"); url.type = "text"; url.className = "lurl"; url.placeholder = "https://site/?q={q}"; url.value = b.url || "";
-    const icon = document.createElement("input"); icon.type = "text"; icon.className = "licon"; icon.placeholder = "◆"; icon.value = b.icon || ""; icon.title = "Optional icon — ⌃⌘Space for emoji/symbols (overrides favicon)";
-    bot.append(url, icon);
-    card.append(top, bot);
-    const refreshPrev = () => { prev.innerHTML = ""; prev.appendChild(makeGlyph(S.bangs[idx])); };
-    kw.oninput = () => { S.bangs[idx].keyword = kw.value.trim(); save(); };
-    name.oninput = () => { S.bangs[idx].name = name.value; save(); };
-    url.oninput = () => { S.bangs[idx].url = url.value; save(); refreshPrev(); };
-    icon.oninput = () => { S.bangs[idx].icon = icon.value.trim(); save(); refreshPrev(); };
-    del.onclick = () => { S.bangs.splice(idx, 1); save(); renderBangEditor(); };
-    wrap.appendChild(card);
-  });
+function openItemModal(kind, idx) {
+  const isLink = kind === "link";
+  const arr = isLink ? (S.links = S.links || []) : (S.bangs = S.bangs || []);
+  const isNew = idx < 0, item = isNew ? {} : arr[idx];
+  const overlay = document.createElement("div"); overlay.className = "modal";
+  const card = document.createElement("div"); card.className = "modal-card"; overlay.appendChild(card);
+  const heading = isNew ? (isLink ? "Add link" : "Add custom search") : (isLink ? "Edit link" : "Edit custom search");
+  card.innerHTML =
+    `<h2 style="margin:0 0 0.7rem;font-size:1.05rem;font-weight:500;display:flex;align-items:center;gap:0.55rem"><span class="sc-ic" id="im-prev"></span>${heading}</h2>` +
+    (isLink
+      ? `<div class="row col"><label class="dim">Title</label><input type="text" id="im-title" placeholder="e.g. GitHub"></div>
+         <div class="row col"><label class="dim">URL</label><input type="text" id="im-url" placeholder="example.com" spellcheck="false" autocapitalize="off"></div>`
+      : `<div class="row col"><label class="dim">Keyword</label><input type="text" id="im-kw" placeholder="e.g. imdb" spellcheck="false" autocapitalize="off"></div>
+         <div class="row col"><label class="dim">Name</label><input type="text" id="im-name" placeholder="e.g. IMDb"></div>
+         <div class="row col"><label class="dim">Search URL — put <code>{q}</code> where the query goes</label><input type="text" id="im-url" placeholder="https://site/search?q={q}" spellcheck="false" autocapitalize="off"></div>`) +
+    `<div class="row col"><label class="dim">Icon — optional (emoji/symbol; ⌃⌘Space)</label><input type="text" id="im-icon" placeholder="◆"></div>
+     <div class="imp-row">${isNew ? "" : '<button class="minibtn sc-del" id="im-del" style="margin-right:auto">Delete</button>'}<button class="minibtn" id="im-cancel">Cancel</button><button class="minibtn accent" id="im-save">Save</button></div>`;
+  document.body.appendChild(overlay);
+  const g = (id) => card.querySelector("#" + id);
+  if (isLink) g("im-title").value = item.title || ""; else { g("im-kw").value = item.keyword || ""; g("im-name").value = item.name || ""; }
+  g("im-url").value = item.url || ""; g("im-icon").value = item.icon || "";
+  const prev = g("im-prev");
+  const refresh = () => { const p = isLink ? { title: g("im-title").value, url: g("im-url").value, icon: g("im-icon").value } : { url: g("im-url").value, icon: g("im-icon").value }; prev.innerHTML = ""; prev.appendChild(makeGlyph(p)); };
+  refresh();
+  card.querySelectorAll("input").forEach((i) => i.addEventListener("input", refresh));
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  g("im-cancel").onclick = close;
+  if (!isNew) g("im-del").onclick = () => { arr.splice(idx, 1); save(); scAfterEdit(kind); close(); };
+  g("im-save").onclick = () => {
+    const url = g("im-url").value.trim(), icon = g("im-icon").value.trim();
+    let rec;
+    if (isLink) {
+      if (!url) return alert("Enter a URL.");
+      rec = { title: g("im-title").value.trim(), url, icon };
+    } else {
+      const kw = g("im-kw").value.trim().toLowerCase().replace(/\s+/g, "");
+      if (!kw) return alert("Enter a keyword.");
+      if (!url.includes("{q}")) return alert("The search URL needs {q} where the query goes.");
+      rec = { keyword: kw, name: g("im-name").value.trim(), url, icon };
+    }
+    if (isNew) arr.push(rec); else arr[idx] = rec;
+    save(); scAfterEdit(kind); close();
+  };
+  setTimeout(() => { const f = isLink ? g("im-title") : g("im-kw"); if (f) f.focus(); }, 40);
 }
 
 function renderPluginToggles() {
@@ -2145,8 +2174,8 @@ function bindControls() {
       () => wxStatus("Location blocked — type a city instead"));
   };
 
-  $("link-add").onclick = () => { (S.links = S.links || []).push({ title: "", url: "", icon: "" }); save(); renderLinkEditor(); };
-  $("bang-add").onclick = () => { (S.bangs = S.bangs || []).push({ keyword: "", name: "", url: "", icon: "" }); save(); renderBangEditor(); };
+  $("link-add").onclick = () => openItemModal("link", -1);
+  $("bang-add").onclick = () => openItemModal("search", -1);
   $("bang-share").onclick = (e) => {
     if (!(S.bangs || []).some((b) => b.keyword && b.url)) { alert("Add a custom search first."); return; }
     const link = shareLink(bangsPayload()), btn = e.currentTarget, o = btn.textContent;

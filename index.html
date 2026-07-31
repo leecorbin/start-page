@@ -280,13 +280,8 @@
   .iconbtn { display: grid; place-items: center; width: 30px; height: 30px; flex: none; padding: 0; background: rgba(255,255,255,0.10); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); cursor: pointer; }
   .iconbtn:hover { background: rgba(255,255,255,0.18); }
   .iconbtn svg { width: 16px; height: 16px; }
-  .sync-sec { margin: 0.3rem 0; }
-  .sync-sec > label.h { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.4rem; }
   .sy-codewrap { display: flex; gap: 0.4rem; align-items: center; margin: 0.3rem 0 0.5rem; }
   .sy-codewrap input { flex: 1; min-width: 0; }
-  .sync-or { display: flex; align-items: center; color: var(--muted); font-size: 0.76rem; margin: 0.9rem 0; }
-  .sync-or::before, .sync-or::after { content: ""; flex: 1; height: 1px; background: var(--field-border); }
-  .sync-or span { padding: 0 0.7rem; }
   .sync-chip .iconbtn { width: 24px; height: 24px; margin-left: auto; }
   .sync-chip .iconbtn svg { width: 14px; height: 14px; }
   #toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(12px); background: rgba(18,22,30,0.97); color: #fff; border: 1px solid rgba(255,255,255,0.16); border-radius: 10px; padding: 0.5rem 0.95rem; font-size: 0.85rem; box-shadow: 0 12px 34px rgba(0,0,0,0.5); opacity: 0; pointer-events: none; transition: opacity 0.22s ease, transform 0.22s ease; z-index: 30; max-width: 90vw; text-align: center; }
@@ -1764,9 +1759,9 @@ function syncOpenSetup() {
   card.innerHTML =
     `<h2 style="margin:0 0 0.3rem;font-size:1.05rem;font-weight:500">Set up sync</h2>
      <p class="grp-note">End-to-end encrypted — your code is the key and never leaves your device. Anyone with it can read your settings, so keep it safe.</p>
-     <div class="sync-sec">
-       <label class="h">Create a new sync</label>
-       <p class="grp-note">Push this device's settings up under a fresh code.</p>
+     <div class="seg" id="sy-mode" style="margin:0.5rem 0 0.2rem"><button type="button" data-mode="create">Create new</button><button type="button" data-mode="connect">Connect existing</button></div>
+     <div id="sy-create-pane">
+       <p class="grp-note" style="margin-top:0.6rem">Push this device's settings up under a fresh code, then add it on your other devices.</p>
        <div class="sy-codewrap"><input type="text" id="sy-code" spellcheck="false" autocapitalize="off" autocorrect="off">
          <button class="iconbtn" id="sy-gen" title="Generate a new code" aria-label="Generate">${SVG_DICE}</button>
          <button class="iconbtn" id="sy-copy" title="Copy code" aria-label="Copy">${SVG_COPY}</button></div>
@@ -1774,18 +1769,23 @@ function syncOpenSetup() {
        <div class="row"><span>Include</span><select id="sy-scope"><option value="settings">Settings</option><option value="all">Everything (incl. history)</option></select></div>
        <button class="minibtn accent" id="sy-create" style="width:100%">Create sync ↑</button>
      </div>
-     <div class="sync-or"><span>or</span></div>
-     <div class="sync-sec">
-       <label class="h">Connect an existing sync</label>
-       <p class="grp-note">Paste a code from another device to pull its settings here.</p>
+     <div id="sy-connect-pane" hidden>
+       <p class="grp-note" style="margin-top:0.6rem">Paste a code from another device to pull its settings onto this one.</p>
        <input type="text" id="sy-existing" placeholder="paste your code" style="width:100%" spellcheck="false" autocapitalize="off" autocorrect="off">
-       <button class="minibtn" id="sy-connect" style="width:100%;margin-top:0.5rem">Connect ↓</button>
+       <button class="minibtn accent" id="sy-connect" style="width:100%;margin-top:0.6rem">Connect ↓</button>
      </div>
      <div class="imp-row"><button class="minibtn" id="sy-cancel">Cancel</button></div>`;
   document.body.appendChild(overlay);
   const code = $("sy-code"); code.value = syncGenCode();
   const close = () => overlay.remove();
   overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  const setMode = (mode) => {
+    card.querySelectorAll("#sy-mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+    $("sy-create-pane").hidden = mode !== "create";
+    $("sy-connect-pane").hidden = mode !== "connect";
+    setTimeout(() => { const f = mode === "create" ? code : $("sy-existing"); if (f) f.focus(); }, 20);
+  };
+  card.querySelectorAll("#sy-mode button").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
   $("sy-cancel").onclick = close;
   $("sy-gen").onclick = () => { code.value = syncGenCode(); };
   $("sy-copy").onclick = async () => { toast(await copyText(code.value) ? "Code copied ✓" : "Copy failed"); };
@@ -1803,6 +1803,7 @@ function syncOpenSetup() {
     if (ok) { sessionStorage.setItem("startpage:toast", "Settings synced from your code ✓"); location.reload(); }
     else syncClearCfg();
   };
+  setMode("create");
 }
 function syncStop() {
   if (!confirm("Stop syncing on this device? Your settings stay put.")) return;

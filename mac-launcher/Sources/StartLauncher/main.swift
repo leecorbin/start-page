@@ -106,12 +106,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     func applicationDidFinishLaunching(_ note: Notification) {
         AppDelegate.shared = self
         NSApp.setActivationPolicy(.accessory)
+        buildMainMenu()                                     // Edit menu → ⌘C/⌘V/⌘X/⌘A work in the web view's fields
         buildWebView()
         buildPanel()
         buildStatusItem()
         installEscapeMonitor()
         hotKey.onFire = { [weak self] in self?.toggle() }
         applyHotKey()
+    }
+
+    // A menu-bar (agent) app has no menu bar, and macOS routes the standard editing
+    // shortcuts through the Edit menu's key equivalents — so without one, ⌘C/⌘V/⌘X/⌘A
+    // never reach text fields (incl. the web view). This installs a minimal menu.
+    func buildMainMenu() {
+        let main = NSMenu()
+        func sub(_ title: String) -> NSMenu { let it = NSMenuItem(); main.addItem(it); let m = NSMenu(title: title); it.submenu = m; return m }
+        func add(_ menu: NSMenu, _ title: String, _ sel: String, _ key: String, _ mods: NSEvent.ModifierFlags = .command) {
+            let i = NSMenuItem(title: title, action: Selector(sel), keyEquivalent: key); i.keyEquivalentModifierMask = mods; menu.addItem(i)
+        }
+        let app = sub("Start Launcher")
+        add(app, "Hide Start Launcher", "hide:", "h")
+        app.addItem(.separator())
+        add(app, "Quit Start Launcher", "terminate:", "q")
+        let edit = sub("Edit")
+        add(edit, "Undo", "undo:", "z"); add(edit, "Redo", "redo:", "z", [.command, .shift])
+        edit.addItem(.separator())
+        add(edit, "Cut", "cut:", "x"); add(edit, "Copy", "copy:", "c"); add(edit, "Paste", "paste:", "v"); add(edit, "Select All", "selectAll:", "a")
+        let win = sub("Window")
+        add(win, "Close", "performClose:", "w")
+        NSApp.mainMenu = main
     }
 
     // ---- the URL to load: adds ?launcher=1, merged with any existing query ----

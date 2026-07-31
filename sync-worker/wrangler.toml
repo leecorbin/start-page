@@ -1,0 +1,16 @@
+name = "startpage-sync"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# The KV namespace that holds the (encrypted) blobs.
+# Create it once with:  npx wrangler kv namespace create SYNC
+# then paste the printed id below.
+kv_namespaces = [
+  { binding = "SYNC", id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE" }
+]
+
+# Serve it at your own subdomain so the client only ever knows api.corbin.uk/api/*
+# (add the `api` DNS record + the zone in Cloudflare first, then uncomment):
+# routes = [
+#   { pattern = "api.corbin.uk/api/*", zone_name = "corbin.uk" }
+# ]

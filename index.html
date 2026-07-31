@@ -268,6 +268,13 @@
   .imp-list code { background: rgba(255,255,255,0.12); border-radius: 4px; padding: 0.05rem 0.35rem; flex: none; }
   .imp-list .dup { color: var(--muted); font-size: 0.78rem; }
   .imp-row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.4rem; }
+  .sync-chip { display: flex; align-items: center; gap: 0.45rem; background: rgba(91,155,255,0.14); border: 1px solid rgba(91,155,255,0.4); border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+  .sync-chip code { background: none; padding: 0; font-size: 0.92em; letter-spacing: 0.02em; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #7de0a0; flex: none; box-shadow: 0 0 6px rgba(125,224,160,0.7); }
+  .modal-card .row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin: 0.55rem 0; font-size: 0.9rem; }
+  .modal-card .row.col { flex-direction: column; align-items: stretch; gap: 0.35rem; }
+  .modal-card select, .modal-card input[type="text"] { background: rgba(255,255,255,0.08); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.88rem; padding: 0.4rem 0.5rem; }
+  .modal-card .dim { color: var(--muted); }
   .minibtn:hover { background: rgba(255,255,255,0.18); }
   .minibtn:disabled { opacity: 0.4; cursor: not-allowed; }
   .minibtn:disabled:hover { background: rgba(255,255,255,0.10); }
@@ -492,6 +499,21 @@
       </div>
     </div>
 
+    <div class="group">
+      <label class="h">Sync</label>
+      <div id="sync-off">
+        <p class="grp-note">End-to-end encrypted sync across devices (and into the launcher). Your code is the key; nothing readable ever reaches the server.</p>
+        <button class="minibtn" id="sync-setup" style="width:100%;">Set up sync…</button>
+      </div>
+      <div id="sync-on" hidden>
+        <div class="sync-chip"><span class="sync-dot"></span><code id="sync-code"></code><span id="sync-status" class="dim"></span></div>
+        <div class="row" style="gap:0.4rem;margin-top:0.5rem;">
+          <button class="minibtn" id="sync-now" style="flex:1;">Sync now</button>
+          <button class="minibtn" id="sync-stop" style="flex:1;">Stop</button>
+        </div>
+      </div>
+    </div>
+
     <button class="reset" id="s-reset">Reset to defaults</button>
     </div>
 
@@ -589,11 +611,11 @@ function load() {
 let S = load();
 if (S.bg.provider === "picsum") S.bg.provider = "photos";                                                  // migrate to unified photos + new-images slider
 else if (S.bg.provider === "favourites") { S.bg.provider = "photos"; if (typeof S.bg.newImages !== "number") S.bg.newImages = 0; }
-function save() { writeLS(K.set, S); }
+function save() { writeLS(K.set, S); if (typeof syncOnChange === "function") syncOnChange(); }
 
 let FAVS = readLS(K.favs) || [];
 const FAV_UNLOCK = 5;   // the new-images slider unlocks once you have this many favourites
-function saveFavs() { writeLS(K.favs, FAVS); }
+function saveFavs() { writeLS(K.favs, FAVS); if (typeof syncOnChange === "function") syncOnChange(); }
 
 let CURRENT = null, lastImg = null;
 const $ = (id) => document.getElementById(id);
@@ -1605,6 +1627,143 @@ function bookmarkletHref() {                                       // runs on th
   return "javascript:" + bm;
 }
 
+/* ============ cloud sync — end-to-end encrypted, optional (Cloudflare Worker backend) ============
+   The server only ever stores ciphertext under a hash-derived id; your sync code is the key and
+   never leaves the device. Last-write-wins with a revision check (not a field merge). */
+const SYNC_API = localStorage.getItem("startpage:syncApi") || "https://api.corbin.uk/api";   // override for testing
+const K_SYNC = "startpage:sync";                                     // device-local config — never itself synced
+
+const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+function unb64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); }
+const utf8 = (s) => new TextEncoder().encode(s);
+async function sha256(str) { return new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(str))); }
+async function syncId(code) { return b64u(await sha256("id|" + code)).slice(0, 43); }          // lookup id — reveals nothing about the code
+async function syncKey(code) {
+  const base = await crypto.subtle.importKey("raw", utf8(code), "PBKDF2", false, ["deriveKey"]);
+  const salt = await sha256("salt|" + code);                        // per-code salt, derived (needs no storage; salt isn't secret)
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 300000, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+async function syncEnc(key, obj) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, utf8(JSON.stringify(obj))));
+  const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return b64u(out);
+}
+async function syncDec(key, b64) {
+  const buf = unb64u(b64);
+  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: buf.slice(0, 12) }, key, buf.slice(12))));
+}
+function syncGenCode() {                                             // strong default: 80 bits, Crockford base32, grouped in 4s
+  const A = "0123456789abcdefghjkmnpqrstvwxyz", b = crypto.getRandomValues(new Uint8Array(10)); let s = "";
+  for (const x of b) s += A[x & 31] + A[(x >> 5) & 31];
+  return s.slice(0, 16).replace(/(.{4})(?=.)/g, "$1-");
+}
+
+const syncCfg = () => readLS(K_SYNC);
+const syncSaveCfg = (c) => writeLS(K_SYNC, c);
+const syncClearCfg = () => { try { localStorage.removeItem(K_SYNC); } catch {} };
+function syncBuildBlob(scope) {                                      // excludes image-rotation state and the sync config itself
+  const blob = { v: 1, set: readLS(K.set) || {}, favs: readLS(K.favs) || [] };
+  if (scope === "all") blob.hist = readLS(K.hist) || [];
+  return blob;
+}
+function syncApplyBlob(blob) {
+  if (blob.set) writeLS(K.set, blob.set);
+  if (blob.favs) writeLS(K.favs, blob.favs);
+  if (blob.hist) writeLS(K.hist, blob.hist);
+}
+async function syncGET(path) { const r = await fetch(SYNC_API + path); if (r.status === 404) return { gone: true }; if (!r.ok) throw new Error("sync " + r.status); return r.json(); }
+const syncPOST = (body) => fetch(SYNC_API + "/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+
+let syncBusy = false;
+async function syncPush(firstTime) {
+  const c = syncCfg(); if (!c || syncBusy) return;
+  syncBusy = true;
+  try {
+    const id = await syncId(c.code), key = await syncKey(c.code);
+    let res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c.scope)), baseRev: c.rev || 0, ttl: c.ttl || 0 });
+    if (res.status === 409) {
+      if (firstTime) { syncClearCfg(); syncRenderGroup(); alert("That code is already in use. Use “Connect ↓” to join it, or generate a different code."); return; }
+      await syncPull(true);                                         // someone else pushed → adopt theirs, then re-push our change
+      const c2 = syncCfg(); if (!c2) return;
+      res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c2.scope)), baseRev: c2.rev || 0, ttl: c2.ttl || 0 });
+    }
+    if (!res.ok) throw new Error("push " + res.status);
+    syncSaveCfg({ ...syncCfg(), rev: (await res.json()).rev });
+    syncUpdateUI("Synced ✓");
+  } catch { syncUpdateUI("Sync failed"); }
+  finally { syncBusy = false; }
+}
+async function syncPull(inner) {
+  const c = syncCfg(); if (!c) return false;
+  const data = await syncGET("/sync/" + (await syncId(c.code)));
+  if (data.gone) { syncStopped("removed"); return false; }
+  let blob; try { blob = await syncDec(await syncKey(c.code), data.ciphertext); } catch { syncUpdateUI("Wrong code?"); return false; }
+  syncApplyBlob(blob);
+  syncSaveCfg({ ...c, rev: data.rev, scope: blob.hist ? "all" : c.scope });
+  if (!inner) syncUpdateUI("Restored ✓");
+  return true;
+}
+async function syncRevCheck() {                                     // on load / focus: pull only if the server is newer
+  const c = syncCfg(); if (!c) return;
+  try {
+    const r = await syncGET("/sync/" + (await syncId(c.code)) + "/rev");
+    if (r.gone) return syncStopped("removed");
+    if ((r.rev || 0) > (c.rev || 0)) { if (await syncPull()) location.reload(); }
+  } catch {}
+}
+async function syncDeleteRemote() { const c = syncCfg(); if (!c) return; try { await fetch(SYNC_API + "/sync/" + (await syncId(c.code)), { method: "DELETE" }); } catch {} }
+function syncStopped(reason) {
+  syncClearCfg(); syncRenderGroup();
+  if (reason === "removed") alert("This sync was removed (deleted or expired elsewhere). Your settings are unchanged — set up a new sync to start again.");
+}
+let syncPushTimer = null;
+function syncOnChange() { if (!syncCfg()) return; clearTimeout(syncPushTimer); syncPushTimer = setTimeout(() => syncPush(), 1500); }
+
+function syncRenderGroup() {
+  const c = syncCfg(), off = $("sync-off"), on = $("sync-on"); if (!off || !on) return;
+  off.hidden = !!c; on.hidden = !c;
+  if (c) { $("sync-code").textContent = c.code; $("sync-status").textContent = ""; }
+}
+function syncUpdateUI(status) { syncRenderGroup(); const s = $("sync-status"); if (s && status) s.textContent = "· " + status; }
+
+function syncOpenSetup() {
+  const overlay = document.createElement("div"); overlay.className = "modal";
+  const card = document.createElement("div"); card.className = "modal-card"; overlay.appendChild(card);
+  card.innerHTML =
+    `<h2 style="margin:0 0 0.3rem;font-size:1.05rem;font-weight:500">Set up sync</h2>
+     <p class="grp-note">Sync your settings across devices — <strong>end-to-end encrypted</strong>. Your code is the key: only devices with it can read your settings, and it never leaves your device. Keep it safe.</p>
+     <div class="row col"><label class="dim" style="font-size:0.76rem">Sync code</label>
+       <div style="display:flex;gap:0.4rem;align-items:center"><input type="text" id="sy-code" style="flex:1" spellcheck="false" autocapitalize="off" autocorrect="off">
+         <button class="minibtn" id="sy-gen" title="Generate a strong code">🎲</button><button class="minibtn" id="sy-copy">Copy</button></div></div>
+     <div class="row"><span>Keep for</span><select id="sy-ttl"><option value="0">Until I remove it</option><option value="86400">24 hours</option><option value="3600">1 hour</option></select></div>
+     <div class="row"><span>Include</span><select id="sy-scope"><option value="settings">Settings</option><option value="all">Everything (incl. history)</option></select></div>
+     <p class="grp-note" style="margin-top:0.4rem"><strong>Create ↑</strong> pushes this device's settings up under the code. <strong>Connect ↓</strong> pulls an existing code's settings down onto this device.</p>
+     <div class="imp-row"><button class="minibtn" id="sy-cancel">Cancel</button><button class="minibtn" id="sy-connect">Connect ↓</button>
+       <button class="minibtn" id="sy-create" style="background:var(--accent);border-color:var(--accent);color:#fff">Create ↑</button></div>`;
+  document.body.appendChild(overlay);
+  const code = $("sy-code"); code.value = syncGenCode();
+  const close = () => overlay.remove();
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+  $("sy-cancel").onclick = close;
+  $("sy-gen").onclick = () => { code.value = syncGenCode(); };
+  $("sy-copy").onclick = () => { try { navigator.clipboard.writeText(code.value); $("sy-copy").textContent = "Copied ✓"; setTimeout(() => ($("sy-copy").textContent = "Copy"), 1500); } catch {} };
+  $("sy-create").onclick = async () => {
+    const c = code.value.trim(); if (c.length < 6) return alert("That code is too short.");
+    syncSaveCfg({ code: c, scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
+    close(); syncRenderGroup(); await syncPush(true);
+  };
+  $("sy-connect").onclick = async () => {
+    const c = code.value.trim(); if (c.length < 6) return alert("Enter your existing code.");
+    syncSaveCfg({ code: c, scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
+    syncRenderGroup(); const ok = await syncPull(); close(); if (ok) location.reload();
+  };
+}
+function syncStop() {
+  if (!confirm("Stop syncing on this device? Your settings stay put.")) return;
+  if (confirm("Also delete this sync from the server? That removes it for every device using this code.")) syncDeleteRemote();
+  syncClearCfg(); syncRenderGroup();
+}
+
 /* ============================ weather ============================ */
 const I = {
   sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`,
@@ -1956,6 +2115,10 @@ function bindControls() {
   $("backup-export").onclick = exportSettings;
   $("backup-import").onclick = () => $("backup-file").click();
   $("backup-file").onchange = (e) => { const f = e.target.files[0]; if (f) importSettings(f); e.target.value = ""; };
+  $("sync-setup").onclick = syncOpenSetup;
+  $("sync-now").onclick = () => syncPush();
+  $("sync-stop").onclick = syncStop;
+  syncRenderGroup();
 
   $("s-showSearch").onchange = () => { S.showSearch = $("s-showSearch").checked; save(); applySearch(); };
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
@@ -2050,6 +2213,7 @@ renderLinks();
 loadWeather();
 bindControls();
 handleShareHash();                                          // a shared "#import=" / bookmarklet link → offer to add the searches
+syncRevCheck();                                             // if a newer copy is on the server, pull it (then reload once)
 window.addEventListener("pageshow", assertFocus);
 /* Refocus the box when returning to this tab/window — but never steal focus
    from another field (e.g. a settings input) the user was working in. */

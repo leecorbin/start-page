@@ -6,7 +6,7 @@ compatibility_date = "2024-11-01"
 # Create it once with:  npx wrangler kv namespace create SYNC
 # then paste the printed id below.
 kv_namespaces = [
-  { binding = "SYNC", id = "PASTE_YOUR_KV_NAMESPACE_ID_HERE" }
+  { binding = "SYNC", id = "3a4c7cd25b6747c0b8a6b8168ffefd7d" }
 ]
 
 # Serve it at your own subdomain so the client only ever knows api.corbin.uk/api/*

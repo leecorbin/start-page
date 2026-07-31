@@ -103,6 +103,16 @@ from here see a direct visit rather than your start page's address.
   option (handy for wide wordmark logos).
 - 💾 **Export / import settings** — back up your whole config (and favourites) to a
   JSON file and restore it on another machine.
+- 🔄 **Encrypted cloud sync** *(optional)* — keep several devices in step with a
+  single **sync code**. There are no accounts, no email and no password: the code
+  *is* the key. Everything is **end-to-end encrypted in your browser** (PBKDF2 →
+  AES-GCM) before it leaves, so the server only ever stores ciphertext it cannot
+  read. Choose to sync just your **settings**, or **everything** (settings +
+  favourites + local site history); a lightweight revision check pulls newer changes
+  when you return to a tab, and **Stop & delete** wipes the server copy (other
+  devices are warned the sync was removed, and keep their local data). It runs on a
+  tiny keyless [Cloudflare Worker + KV](sync-worker/) you can self-host in minutes —
+  there's no backend that can see your data.
 - 🌗 **Dynamic contrast** — samples the background's brightness and flips text/icons
   to stay legible on light *or* dark photos.
 - 🕰️ **Digital or analogue clock** (analogue has a second hand) + time-of-day
@@ -212,9 +222,32 @@ focusing its *own* address bar for new tabs and a page can't override it — so
 origin it works as expected.** (Either way, `⌘L` always focuses Safari's address
 bar, with full history/autocomplete.)
 
+## Also in this repo
+
+Two optional companions live alongside the page. Neither is required — the start
+page is complete on its own — and each has its own README.
+
+- 🖥️ **[`mac-launcher/`](mac-launcher/)** — a tiny macOS **menu-bar quick-launcher**
+  that pops the start page in a floating window on a global hotkey (default
+  ⌥Space), for a Spotlight-style "new tab anywhere". A native Swift/AppKit +
+  WKWebView agent app: `esc` steps back (and closes when there's nowhere left to
+  go), ⌘⎋ closes instantly, with a settings window, an optional login item and a
+  configurable hotkey. Build it with `mac-launcher/build.sh`.
+- ☁️ **[`sync-worker/`](sync-worker/)** — the keyless **Cloudflare Worker + KV**
+  backend behind *Encrypted cloud sync* above. It's a zero-knowledge blob store:
+  it only ever sees ciphertext, holds no keys or secrets, and does last-write-wins
+  with a compare-and-swap revision check and a retention TTL. Deploy your own with
+  `npx wrangler deploy` and point the page at it in one line.
+
 ## Compliance / data
 
 - No analytics, no cookies, no accounts. Settings stay in your browser.
+- **Cloud sync is opt-in and end-to-end encrypted.** Your sync code never leaves
+  the browser; it's stretched (PBKDF2) into an AES-GCM key locally, so the Worker
+  stores only ciphertext and can't read, index or de-anonymise your data. No
+  account, email or password is involved, and you can delete the server copy at any
+  time. The default endpoint is a Worker the author runs, but it's [self-hostable in
+  minutes](sync-worker/) if you'd rather trust your own.
 - Backgrounds use only **keyless** providers, within their intended use:
   - Picsum images come from Unsplash; we display the photographer credit with a
     referral link.

@@ -1,2 +1,9 @@
 .DS_Store
 .claude/
+
+# Local working files (not part of the shipped product):
+# brand-name brainstorm, logo/brand design source (WIP), editor lock files.
+# Commit final brand assets explicitly if you want them tracked.
+naming-ideas.md
+graphics/
+*~lock~

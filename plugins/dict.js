@@ -2,8 +2,12 @@
    Keyless word lookup — definitions, pronunciation, and an extensive thesaurus
    (synonyms/antonyms/broader/narrower/related) from our own self-hosted lexicon
    service (see ../lexicon/), a Wikipedia excerpt, and optional slang (Urban
-   Dictionary, off by default). Click any word to look it up; ← to retrace.
-   The only plugin that hits the network — debounced + cached. Part of start-page (MIT). */
+   Dictionary, off by default). Type a pattern with ? (one letter) or * (any run) —
+   e.g. F?SH, J*CK — for an offline crossword/anagram-style lookup against a local
+   ~350k-word list (lexicon-wordlist.txt, shipped alongside this file; only source
+   is Moby Word Lists, public domain — no CC BY-SA content in the client bundle).
+   Click any word to look it up; ← to retrace. The only plugin that hits the
+   network — debounced + cached. Part of start-page (MIT). */
 
 const CSS = `
 .dxp { height: 100%; overflow-y: auto; color: var(--fg, #f4f6fb); font-size: 0.92rem; }
@@ -53,6 +57,7 @@ const CSS = `
 
 const PH_HTML = `<div class="dx-ph">Type a word to look it up — definitions &amp; pronunciation,
 an extensive thesaurus (click any word to follow it), and a Wikipedia excerpt. Try <code>serendipity</code>.<br>
+Or type a <strong>crossword pattern</strong> — <code>?</code> for one letter, <code>*</code> for any run — like <code>F?SH</code> or <code>J*CK</code>, fully offline.<br>
 <span style="opacity:0.7">Uses the network (keyless) — results are cached as you go. ⚙ enables slang.</span></div>`;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -95,6 +100,29 @@ async function fetchUrban(w) {
   return (j.list || []).sort((a, b) => (b.thumbs_up || 0) - (a.thumbs_up || 0)).slice(0, 2);
 }
 
+/* ---- crossword / pattern lookup: local wordlist, fetched once, matched offline ---- */
+const WORDLIST_URL = new URL("./lexicon-wordlist.txt", import.meta.url).href;
+const MAX_PATTERN_MATCHES = 60;
+let wordlistPromise = null;
+function loadWordlist() {
+  if (!wordlistPromise) {
+    wordlistPromise = fetch(WORDLIST_URL).then((r) => (r.ok ? r.text() : "")).then((t) => t.split("\n").filter(Boolean)).catch(() => []);
+  }
+  return wordlistPromise;
+}
+const isPattern = (s) => /[?*]/.test(s) && /^[a-zA-Z?*]+$/.test(s);
+function patternRegex(p) {
+  const escaped = p.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  return new RegExp("^" + escaped.replace(/\?/g, ".").replace(/\*/g, ".*") + "$", "i");
+}
+async function matchPattern(pattern) {
+  const words = await loadWordlist();
+  const re = patternRegex(pattern);
+  const out = [];
+  for (const w of words) { if (re.test(w)) { out.push(w); if (out.length >= MAX_PATTERN_MATCHES) break; } }
+  return out;
+}
+
 /* ---- state ---- */
 let api = null, scrollEl = null, innerEl = null, toastEl = null, styleEl = null, settingsBtn = null;
 let term = "", history = [], gen = 0, cache = {}, debounceT = 0, toastT = 0, settingsOpen = false, imageView = null;
@@ -106,6 +134,7 @@ function lookup(word, push) {
   word = (word || "").trim();
   imageView = null;
   if (!word) { term = ""; gen++; render(true); return; }
+  if (isPattern(word)) { lookupPattern(word, push); return; }
   if (push && term && term.toLowerCase() !== word.toLowerCase()) history.push(term);
   term = word;
   const g = ++gen;
@@ -115,6 +144,16 @@ function lookup(word, push) {
     fetchThesaurus(word).then((d) => done(g, word, "thes", d), () => done(g, word, "thes", null));
     if (SET.wiki) fetchWiki(word).then((d) => done(g, word, "wiki", d), () => done(g, word, "wiki", null));
     if (SET.urban) fetchUrban(word).then((d) => done(g, word, "urban", d), () => done(g, word, "urban", null));
+  }
+  render(true);
+}
+function lookupPattern(pattern, push) {
+  if (push && term && term.toLowerCase() !== pattern.toLowerCase()) history.push(term);
+  term = pattern;
+  const g = ++gen;
+  if (!cache[pattern]) {
+    cache[pattern] = { pattern: true, matches: undefined };
+    matchPattern(pattern).then((m) => done(g, pattern, "matches", m), () => done(g, pattern, "matches", []));
   }
   render(true);
 }
@@ -189,6 +228,19 @@ function buildView(word, d) {
   }
   return html;
 }
+function patternView(pattern, d) {
+  const back = history.length ? `<button type="button" class="dx-back" data-act="back" title="Back" aria-label="Back">←</button>` : "";
+  let html = `<div class="dx-head">${back}<span class="dx-word">${esc(pattern.toUpperCase())}</span></div>`;
+  html += `<div class="dx-sec"><div class="dx-h">Crossword <span class="dx-hint">· ? = one letter, * = any run · click a word to look it up</span></div>`;
+  if (d.matches === undefined) html += loading();
+  else if (!d.matches.length) html += `<div class="dx-none">No matches.</div>`;
+  else {
+    html += `<div class="dx-chips">${d.matches.map(chip).join("")}</div>`;
+    if (d.matches.length >= MAX_PATTERN_MATCHES) html += `<div class="dx-note">Showing the first ${MAX_PATTERN_MATCHES} matches.</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
 function settingsView() {
   const sw = (act, on, label) => `<button type="button" class="dx-switch${on ? " on" : ""}" data-act="${act}"><span class="dx-knob"></span><span class="dx-swlabel">${label}</span></button>`;
   return `<div class="dx-head"><button type="button" class="dx-back" data-act="settings-close" title="Back" aria-label="Back">←</button><span class="dx-word" style="font-size:1.05rem;">Sources &amp; options</span></div>
@@ -204,7 +256,8 @@ function imageView_() {
 function render(resetScroll) {
   if (!innerEl) return;
   const sv = scrollEl ? scrollEl.scrollTop : 0;
-  innerEl.innerHTML = imageView ? imageView_() : settingsOpen ? settingsView() : (term ? buildView(term, cache[term] || {}) : PH_HTML);
+  const entry = term ? cache[term] || {} : null;
+  innerEl.innerHTML = imageView ? imageView_() : settingsOpen ? settingsView() : !term ? PH_HTML : entry.pattern ? patternView(term, entry) : buildView(term, entry);
   if (scrollEl) scrollEl.scrollTop = resetScroll ? 0 : sv;
   fit();
   if (imageView) { const im = innerEl.querySelector(".dx-imgview img"); if (im && !im.complete) im.onload = im.onerror = fit; }   // re-fit once the (capped) image has real dimensions
@@ -237,9 +290,10 @@ as the colour lab).</p>
   <tr><td><kbd>definitions</kbd></td><td>by part of speech, with examples and pronunciation, from our own lexicon</td></tr>
   <tr><td><kbd>thesaurus</kbd></td><td>synonyms, antonyms, broader/narrower terms and related words — hundreds per word, not a handful</td></tr>
   <tr><td><kbd>wikipedia</kbd></td><td>a summary excerpt + image with a link, when an article exists — click the image to enlarge it</td></tr>
+  <tr><td><kbd>F?SH</kbd> <kbd>J*CK</kbd></td><td>crossword patterns — <kbd>?</kbd> one letter, <kbd>*</kbd> any run — matched against a local ~350k-word list, fully offline after the first use</td></tr>
   <tr><td><kbd>⚙</kbd></td><td>toggle <strong>Wikipedia</strong> (on) and <strong>Urban Dictionary</strong> slang (off; user-submitted, can be explicit)</td></tr>
 </table>
-<p>This is the one plugin that uses the network, so it needs a connection — lookups are debounced and cached as you go.</p>`;
+<p>Definitions/thesaurus/Wikipedia need a connection (debounced and cached as you go); crossword patterns work offline once the word list has loaded once.</p>`;
 
 const plugin = {
   hints: [["click", "follow a word"], ["←", "back"], ["⚙", "slang"]],

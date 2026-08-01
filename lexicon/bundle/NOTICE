@@ -1,0 +1,7 @@
+This bundle is shipped to the browser for offline crossword / pattern / anagram
+lookups in the "??" plugin's crossword mode.
+
+wordlist.txt
+  Source: Moby Word Lists, by Grady Ward.
+  Licence: Public domain (author grant, January 2001).
+  https://www.gutenberg.org/ebooks/3201

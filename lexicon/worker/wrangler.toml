@@ -1,0 +1,21 @@
+name = "startpage-lexicon"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# The D1 database that holds the ingested dictionary/thesaurus/pronunciation data.
+# Create it once with:  npx wrangler d1 create startpage-lexicon
+# then paste the printed database_id below, load the schema with:
+#   npx wrangler d1 execute startpage-lexicon --remote --file=schema.sql
+# and load the ingested data — see ../ingest/README (or ../README.md) for the
+# export-to-remote-D1 step, since ingest currently writes to a local dev sqlite
+# file for speed; pushing it to remote D1 is a separate, one-time job.
+[[d1_databases]]
+binding = "DB"
+database_name = "startpage-lexicon"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# Serve it at your own subdomain so the client only ever knows api.<brand>.uk/dict/*
+# (add the `api` DNS record + the zone in Cloudflare first, then uncomment):
+# routes = [
+#   { pattern = "api.<brand>.uk/dict/*", zone_name = "<brand>.uk" }
+# ]

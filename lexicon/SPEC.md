@@ -11,8 +11,9 @@ session) within this project** can build the ingest pipeline and functions from 
 is deliberately additive — start minimal, grow to comprehensive, never break the
 client contract.
 
-Status: **spec / not yet built.** Sibling of `sync-worker/` (same Cloudflare account,
-same "client only ever knows `api.<brand>.uk`" pattern).
+Status: **Phase 0 done** (schema + ingest, verified — see [README.md](README.md) for
+proven results and exact numbers). Phases 1–3 not started. Sibling of `sync-worker/`
+(same Cloudflare account, same "client only ever knows `api.<brand>.uk`" pattern).
 
 > **Related but separate:** film/TV/people lookup is its **own plugin** (`plugins/`,
 > keyless Wikidata/WDQS — see the screen-lookup design), not part of this lexicon
@@ -250,9 +251,15 @@ Route by input shape (extends today's plugin philosophy):
 
 ## 12. Phased milestones
 
-- **Phase 0 — schema + ingest (no AI).** D1 loaded from Wiktextract + OEWN + Moby +
-  CMUdict + frequency. Local wordlist bundle emitted. *Acceptance:* `/define` and
-  `/thesaurus` return richer results than current `??`; `/pattern` works locally.
+- **Phase 0 — schema + ingest (no AI). ✅ DONE.** D1-compatible schema loaded from
+  Wiktextract (sampled — see README.md) + OEWN + Moby + CMUdict + frequency: 522,924
+  words, 194,133 senses, 3.13M relations, 136,419 pronunciations. Local wordlist bundle
+  emitted (~1 MB gzip). *Acceptance met:* verified against real queries — "happy" → 222
+  synonyms (vs Datamuse's 14), structured broader/narrower/antonym relations Datamuse
+  never exposed, `F?SH`/`J*CK` pattern matching works fully offline. A minimal Worker
+  (`worker/src/worker.js`) implementing `/define` `/thesaurus` `/pattern` `/health` is
+  written and its SQL verified against the dev database, but **not yet deployed** —
+  that's Phase 1 (needs a real D1 database + Cloudflare Worker deploy, the domain).
 - **Phase 1 — wire the plugin.** Point `??` at the API, input-shape routing, ship
   crossword locally, drop Datamuse. *Acceptance:* the plugin is fully keyless and better
   than today.

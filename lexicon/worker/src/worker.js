@@ -10,6 +10,7 @@
  *   GET /dict/define?w=<word>              -> { word, senses[], pron, attribution }
  *   GET /dict/thesaurus?w=<word>           -> { word, groups{}, attribution }
  *   GET /dict/pattern?p=F?SH&max=50        -> { pattern, matches[], attribution }  (usually answered locally; parity/rare-word fallback)
+ *   GET /dict/rhyme?w=<word>&max=50        -> { word, rhymeKey, matches[], attribution }
  *   GET /dict/health                       -> { ok, counts }
  *
  * Semantic /dict/reverse (Vectorize + Workers AI) is Phase 2 — not implemented yet.
@@ -51,15 +52,37 @@ async function define(db, w) {
 
   const pronRow = await db.prepare("SELECT ipa, arpabet FROM pron WHERE word_id = ? AND ipa IS NOT NULL LIMIT 1")
     .bind(word.id).first();
-  const arpaRow = await db.prepare("SELECT arpabet FROM pron WHERE word_id = ? AND arpabet IS NOT NULL LIMIT 1")
+  const arpaRow = await db.prepare("SELECT arpabet, rhyme_key FROM pron WHERE word_id = ? AND arpabet IS NOT NULL LIMIT 1")
     .bind(word.id).first();
 
   return json({
     word: word.word,
     senses,
-    pron: { ipa: (pronRow && pronRow.ipa) || null, arpabet: (arpaRow && arpaRow.arpabet) || null },
+    pron: {
+      ipa: (pronRow && pronRow.ipa) || null,
+      arpabet: (arpaRow && arpaRow.arpabet) || null,
+      rhymeKey: (arpaRow && arpaRow.rhyme_key) || null,
+    },
     attribution: attributionFor(senses.map((s) => s.source)),
   });
+}
+
+async function rhyme(db, w, max) {
+  const word = await findWord(db, w);
+  if (!word) return json({ word: w, rhymeKey: null, matches: [], attribution: [] });
+
+  const self = await db.prepare("SELECT rhyme_key FROM pron WHERE word_id = ? AND rhyme_key IS NOT NULL LIMIT 1")
+    .bind(word.id).first();
+  if (!self) return json({ word: word.word, rhymeKey: null, matches: [], attribution: [] });
+
+  const rows = (await db.prepare(
+    `SELECT DISTINCT dst.word AS word, dst.freq AS freq
+     FROM pron p JOIN word dst ON dst.id = p.word_id
+     WHERE p.rhyme_key = ? AND dst.norm != ?
+     ORDER BY dst.freq DESC, dst.word LIMIT ?`
+  ).bind(self.rhyme_key, word.word.toLowerCase(), Math.min(Math.max(Number(max) || 50, 1), 200)).all()).results;
+
+  return json({ word: word.word, rhymeKey: self.rhyme_key, matches: rows.map((r) => r.word), attribution: attributionFor(["cmudict"]) });
 }
 
 const REL_GROUPS = { synonyms: "syn", antonyms: "ant", broader: "broader", narrower: "narrower", related: "related" };
@@ -115,6 +138,7 @@ export default {
     if (parts[1] === "define") return define(env.DB, url.searchParams.get("w"));
     if (parts[1] === "thesaurus") return thesaurus(env.DB, url.searchParams.get("w"));
     if (parts[1] === "pattern") return pattern(env.DB, url.searchParams.get("p"), url.searchParams.get("max"));
+    if (parts[1] === "rhyme") return rhyme(env.DB, url.searchParams.get("w"), url.searchParams.get("max"));
     if (parts[1] === "health") return health(env.DB);
     return json({ error: "not_found" }, 404);
   },

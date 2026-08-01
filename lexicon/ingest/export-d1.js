@@ -45,7 +45,8 @@ function buildExports() {
     tableExport("sense", ["id", "word_id", "pos", "gloss", "examples", "source"], (r) =>
       [r.id, r.word_id, sqlStr(r.pos), sqlStr(r.gloss), sqlStr(r.examples), sqlStr(r.source)]),
     tableExport("rel", ["src_id", "dst_id", "kind", "source"], (r) => [r.src_id, r.dst_id, sqlStr(r.kind), sqlStr(r.source)]),
-    tableExport("pron", ["word_id", "ipa", "arpabet", "source"], (r) => [r.word_id, sqlStr(r.ipa), sqlStr(r.arpabet), sqlStr(r.source)]),
+    tableExport("pron", ["word_id", "ipa", "arpabet", "rhyme_key", "source"], (r) =>
+      [r.word_id, sqlStr(r.ipa), sqlStr(r.arpabet), sqlStr(r.rhyme_key), sqlStr(r.source)]),
   ];
 }
 

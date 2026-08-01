@@ -137,12 +137,14 @@ CREATE INDEX rel_src ON rel(src_id, kind);
 
 -- pronunciations
 CREATE TABLE pron (
-  word_id   INTEGER NOT NULL REFERENCES word(id),
-  ipa       TEXT,
-  arpabet   TEXT,                     -- from CMUdict, enables rhyme/sounds-like
-  source    TEXT NOT NULL
+  word_id    INTEGER NOT NULL REFERENCES word(id),
+  ipa        TEXT,
+  arpabet    TEXT,                    -- from CMUdict, enables rhyme/sounds-like
+  rhyme_key  TEXT,                    -- derived at ingest: last primary-stressed vowel to the end, stress-stripped
+  source     TEXT NOT NULL
 );
 CREATE INDEX pron_word ON pron(word_id);
+CREATE INDEX pron_rhyme ON pron(rhyme_key);
 ```
 
 Vectorize: one vector per `sense.id` (metadata: `word_id`, `word`, short gloss, `freq`)
@@ -182,7 +184,7 @@ for whatever it drew on. **Additive: add fields, never remove.**
 ```
 GET /dict/define?w=<word>
 → { word, senses:[ {pos, gloss, examples:[…], source} ],
-    pron:{ ipa, arpabet }, attribution:[…] }
+    pron:{ ipa, arpabet, rhymeKey }, attribution:[…] }
 
 GET /dict/thesaurus?w=<word>
 → { word,
@@ -191,6 +193,9 @@ GET /dict/thesaurus?w=<word>
 
 GET /dict/pattern?p=F?SH&max=50          # crossword — usually answered LOCALLY,
 → { pattern, matches:[…] }               # endpoint exists for parity/rare words
+
+GET /dict/rhyme?w=<word>&max=50          # from pron.rhyme_key (CMUdict-derived)
+→ { word, rhymeKey, matches:[…], attribution:[…] }
 
 GET /dict/reverse?q=<free-text description>&max=25&sp=<optional pattern>
 → { query,
@@ -251,15 +256,21 @@ Route by input shape (extends today's plugin philosophy):
 
 ## 12. Phased milestones
 
-- **Phase 0 — schema + ingest (no AI). ✅ DONE.** D1-compatible schema loaded from
-  Wiktextract (sampled — see README.md) + OEWN + Moby + CMUdict + frequency: 522,924
-  words, 194,133 senses, 3.13M relations, 136,419 pronunciations. Local wordlist bundle
-  emitted (~1 MB gzip). *Acceptance met:* verified against real queries — "happy" → 222
-  synonyms (vs Datamuse's 14), structured broader/narrower/antonym relations Datamuse
-  never exposed, `F?SH`/`J*CK` pattern matching works fully offline. A minimal Worker
-  (`worker/src/worker.js`) implementing `/define` `/thesaurus` `/pattern` `/health` is
-  written and its SQL verified against the dev database, but **not yet deployed** —
-  that's Phase 1 (needs a real D1 database + Cloudflare Worker deploy, the domain).
+- **Phase 0 — schema + ingest (no AI). ✅ DONE.** D1-compatible schema loaded from the
+  **complete** Wiktextract dump (3.19 GB / 1,481,704 lines — not a sample) + OEWN + Moby
+  + CMUdict + frequency: 1,517,324 words, 1,956,923 senses, 3,320,327 relations, 272,161
+  pronunciations. Local wordlist bundle emitted (~1 MB gzip). A rhyme/sounds-like key is
+  derived at ingest from CMUdict (`pron.rhyme_key`). *Acceptance met:* verified against
+  real queries — "happy" → 258 synonyms (vs Datamuse's 14), structured
+  broader/narrower/antonym relations Datamuse never exposed, `F?SH`/`J*CK` pattern
+  matching and rhyme lookups (night → right/might/tonight/quite/fight…) work fully
+  offline. A Worker (`worker/src/worker.js`) implementing `/define` `/thesaurus`
+  `/pattern` `/rhyme` `/health` is written and its SQL verified against the dev
+  database; `ingest/export-d1.js` batches the full dataset into D1-ready SQL and the
+  round-trip (export → reload → identical row counts + correct queries) is verified.
+  **Not yet deployed** — that's Phase 1 (needs a real D1 database + Cloudflare Worker
+  deploy + the domain; the import step itself is already scripted, so Phase 1 is purely
+  the Cloudflare/DNS setup + plugin wiring, not more data engineering).
 - **Phase 1 — wire the plugin.** Point `??` at the API, input-shape routing, ship
   crossword locally, drop Datamuse. *Acceptance:* the plugin is fully keyless and better
   than today.
@@ -296,5 +307,8 @@ lexicon/
 - How aggressively to prune Wiktionary senses (obsolete/dialectal/rare) for signal.
 - Whether to ship the optional common-word mini-dictionary locally (offline basics) or keep
   all definitions server-side (smaller bundle). Start server-side; revisit.
-- Rhyme/sounds-like: derive keys at ingest (store in `pron`) vs compute on demand.
+- ~~Rhyme/sounds-like: derive keys at ingest (store in `pron`) vs compute on demand.~~
+  **Resolved:** derived at ingest. `pron.rhyme_key` = the phonemes from the last
+  primary-stressed vowel to the end (stress digits stripped) — e.g. night/light/sight/bite
+  all key to "AY T". `GET /dict/rhyme?w=` finds other words sharing a word's key.
 - Vectorize granularity: one vector per sense (precise) vs per word (smaller index).

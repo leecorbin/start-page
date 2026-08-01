@@ -24,12 +24,14 @@ async function run(db, wordId) {
   const insertRel = db.prepare("INSERT INTO rel (src_id, dst_id, kind, source) VALUES (?, ?, ?, 'wiktionary')");
   const insertPron = db.prepare("INSERT INTO pron (word_id, ipa, source) VALUES (?, ?, 'wiktionary')");
 
-  let rows = 0;
+  let rows = 0, skipped = 0;
   db.exec("BEGIN");
   const rl = readline.createInterface({ input: fs.createReadStream(FILE), crlfDelay: Infinity });
   for await (const line of rl) {
     if (!line.trim()) continue;
-    const d = JSON.parse(line);
+    let d;
+    try { d = JSON.parse(line); }
+    catch { skipped++; continue; }   // the ~3.2GB dump has a handful of genuinely truncated lines upstream
     if (d.lang_code && d.lang_code !== "en") continue;
     const id = wordId(d.word);
     if (id == null) continue;
@@ -57,6 +59,7 @@ async function run(db, wordId) {
     if (withIpa) { insertPron.run(id, withIpa.ipa); rows++; }
   }
   db.exec("COMMIT");
+  if (skipped) console.log(`  (skipped ${skipped} malformed line(s) in the source dump)`);
   return rows;
 }
 

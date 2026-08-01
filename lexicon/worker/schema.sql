@@ -33,12 +33,14 @@ CREATE INDEX IF NOT EXISTS rel_src ON rel(src_id, kind);
 
 -- pronunciations
 CREATE TABLE IF NOT EXISTS pron (
-  word_id   INTEGER NOT NULL REFERENCES word(id),
-  ipa       TEXT,
-  arpabet   TEXT,                     -- from CMUdict, enables rhyme/sounds-like
-  source    TEXT NOT NULL
+  word_id    INTEGER NOT NULL REFERENCES word(id),
+  ipa        TEXT,
+  arpabet    TEXT,                    -- from CMUdict, enables rhyme/sounds-like
+  rhyme_key  TEXT,                    -- from the last primary-stressed vowel to the end, stress-stripped
+  source     TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS pron_word ON pron(word_id);
+CREATE INDEX IF NOT EXISTS pron_rhyme ON pron(rhyme_key);
 
 -- one row per ingest run, so we can tell what's loaded and re-run safely
 CREATE TABLE IF NOT EXISTS ingest_log (

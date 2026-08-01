@@ -1,6 +1,7 @@
 /* start-page plugin: Dictionary / lookup (trigger "??")
-   Keyless word lookup — definitions + pronunciation (dictionaryapi.dev), a
-   thesaurus (Datamuse), a Wikipedia excerpt, and optional slang (Urban
+   Keyless word lookup — definitions, pronunciation, and an extensive thesaurus
+   (synonyms/antonyms/broader/narrower/related) from our own self-hosted lexicon
+   service (see ../lexicon/), a Wikipedia excerpt, and optional slang (Urban
    Dictionary, off by default). Click any word to look it up; ← to retrace.
    The only plugin that hits the network — debounced + cached. Part of start-page (MIT). */
 
@@ -14,8 +15,6 @@ const CSS = `
 .dx-back:hover { background: rgba(255,255,255,0.14); }
 .dx-word { font-size: 1.4rem; font-weight: 600; }
 .dx-ipa { font-size: 0.95rem; color: var(--muted, rgba(244,246,251,0.6)); font-family: ui-monospace, Menlo, monospace; }
-.dx-audio { flex: none; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: none; background: var(--accent, #5b9bff); color: #fff; cursor: pointer; font-size: 0.7rem; }
-.dx-audio:hover { filter: brightness(1.1); }
 .dx-sec { display: flex; flex-direction: column; gap: 0.35rem; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 0.75rem; padding-top: 0.75rem; }
 .dx-h { font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted, rgba(244,246,251,0.6)); }
 .dx-hint { text-transform: none; letter-spacing: 0; opacity: 0.7; }
@@ -53,7 +52,7 @@ const CSS = `
 `;
 
 const PH_HTML = `<div class="dx-ph">Type a word to look it up — definitions &amp; pronunciation,
-a thesaurus (click any word to follow it), and a Wikipedia excerpt. Try <code>serendipity</code>.<br>
+an extensive thesaurus (click any word to follow it), and a Wikipedia excerpt. Try <code>serendipity</code>.<br>
 <span style="opacity:0.7">Uses the network (keyless) — results are cached as you go. ⚙ enables slang.</span></div>`;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -71,14 +70,17 @@ let SET = (() => { try { return Object.assign({}, SET_DEFAULTS, JSON.parse(local
 function persistSettings() { try { localStorage.setItem(DKEY, JSON.stringify(SET)); } catch {} }
 
 /* ---- sources (all keyless + CORS) ---- */
-async function fetchDict(w) {
-  const r = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(w)}`);
+/* Own self-hosted lexicon service (see ../lexicon/SPEC.md) — definitions +
+   thesaurus, replacing dictionaryapi.dev + Datamuse. Override with
+   localStorage["startpage:dictApi"] (e.g. to point at a local dev Worker). */
+const DICT_API = localStorage.getItem("startpage:dictApi") || "https://startpage-lexicon.leecorbin.workers.dev/dict";
+async function fetchDefine(w) {
+  const r = await fetch(`${DICT_API}/define?w=${encodeURIComponent(w)}`);
   return r.ok ? r.json() : null;
 }
-async function fetchDatamuse(w) {
-  const get = (rel) => fetch(`https://api.datamuse.com/words?${rel}=${encodeURIComponent(w)}&max=14`).then((r) => (r.ok ? r.json() : [])).catch(() => []);
-  const [syn, ant, trg] = await Promise.all([get("rel_syn"), get("rel_ant"), get("rel_trg")]);
-  return { syn: syn.map((x) => x.word), ant: ant.map((x) => x.word), trg: trg.map((x) => x.word) };
+async function fetchThesaurus(w) {
+  const r = await fetch(`${DICT_API}/thesaurus?w=${encodeURIComponent(w)}`);
+  return r.ok ? r.json() : null;
 }
 async function fetchWiki(w) {
   const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(w)}`);
@@ -108,9 +110,9 @@ function lookup(word, push) {
   term = word;
   const g = ++gen;
   if (!cache[word]) {
-    cache[word] = { dict: undefined, dm: undefined, wiki: SET.wiki ? undefined : null, urban: SET.urban ? undefined : null };
-    fetchDict(word).then((d) => done(g, word, "dict", d), () => done(g, word, "dict", null));
-    fetchDatamuse(word).then((d) => done(g, word, "dm", d), () => done(g, word, "dm", null));
+    cache[word] = { def: undefined, thes: undefined, wiki: SET.wiki ? undefined : null, urban: SET.urban ? undefined : null };
+    fetchDefine(word).then((d) => done(g, word, "def", d), () => done(g, word, "def", null));
+    fetchThesaurus(word).then((d) => done(g, word, "thes", d), () => done(g, word, "thes", null));
     if (SET.wiki) fetchWiki(word).then((d) => done(g, word, "wiki", d), () => done(g, word, "wiki", null));
     if (SET.urban) fetchUrban(word).then((d) => done(g, word, "urban", d), () => done(g, word, "urban", null));
   }
@@ -124,35 +126,47 @@ function done(g, word, key, val) {
 /* ---- render ---- */
 const chip = (w) => `<button type="button" class="dx-chip" data-word="${esc(w)}">${esc(w)}</button>`;
 const loading = () => `<div class="dx-loading">…</div>`;
+function groupSenses(senses) {
+  const order = [], byPos = new Map();
+  for (const s of senses || []) {
+    if (!byPos.has(s.pos)) { order.push(s.pos); byPos.set(s.pos, []); }
+    byPos.get(s.pos).push(s);
+  }
+  return order.map((pos) => ({ pos, senses: byPos.get(pos) }));
+}
+function attributionNote(...sources) {
+  const seen = new Map();
+  for (const list of sources) for (const a of list || []) if (!seen.has(a.source)) seen.set(a.source, a);
+  const items = [...seen.values()];
+  if (!items.length) return "";
+  return `<div class="dx-note">Data: ${items.map((a) => `<a class="dx-wikilink" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.source)}</a>`).join(" · ")}</div>`;
+}
 function buildView(word, d) {
-  const dict = d.dict;
-  let phon = "", audio = "";
-  if (dict && dict.length) for (const e of dict) for (const p of (e.phonetics || [])) { if (!phon && p.text) phon = p.text; if (!audio && p.audio) audio = p.audio; }
+  const def = d.def;
+  const ipa = def && def.pron && def.pron.ipa;
   const back = history.length ? `<button type="button" class="dx-back" data-act="back" title="Back" aria-label="Back">←</button>` : "";
-  let html = `<div class="dx-head">${back}<span class="dx-word">${esc(word)}</span>${phon ? `<span class="dx-ipa">${esc(phon)}</span>` : ""}${audio ? `<button type="button" class="dx-audio" data-audio="${esc(audio)}" title="Play pronunciation" aria-label="Play pronunciation">▶</button>` : ""}</div>`;
+  let html = `<div class="dx-head">${back}<span class="dx-word">${esc(word)}</span>${ipa ? `<span class="dx-ipa">${esc(ipa)}</span>` : ""}</div>`;
 
   html += `<div class="dx-sec"><div class="dx-h">Definitions</div>`;
-  if (dict === undefined) html += loading();
-  else if (!dict || !dict.length) html += `<div class="dx-none">No dictionary entry found.</div>`;
-  else html += dict.flatMap((e) => e.meanings || []).map((m) =>
-    `<div class="dx-pos"><span class="dx-postag">${esc(m.partOfSpeech || "")}</span><ol class="dx-defs">${(m.definitions || []).slice(0, 4).map((df) =>
-      `<li>${esc(df.definition)}${df.example ? `<div class="dx-ex">“${esc(df.example)}”</div>` : ""}</li>`).join("")}</ol></div>`).join("");
+  if (def === undefined) html += loading();
+  else if (!def || !def.senses || !def.senses.length) html += `<div class="dx-none">No dictionary entry found.</div>`;
+  else html += groupSenses(def.senses).map((g) =>
+    `<div class="dx-pos"><span class="dx-postag">${esc(g.pos || "")}</span><ol class="dx-defs">${g.senses.slice(0, 6).map((s) =>
+      `<li>${esc(s.gloss)}${s.examples && s.examples[0] ? `<div class="dx-ex">“${esc(s.examples[0])}”</div>` : ""}</li>`).join("")}</ol></div>`).join("");
   html += `</div>`;
 
-  const dm = d.dm;
-  const fromDict = (kind) => dict && dict.length ? dict.flatMap((e) => (e.meanings || []).flatMap((m) => [...(m[kind] || []), ...(m.definitions || []).flatMap((df) => df[kind] || [])])) : [];
-  const syn = uniq([...(dm && dm.syn || []), ...fromDict("synonyms")], word).slice(0, 16);
-  const ant = uniq([...(dm && dm.ant || []), ...fromDict("antonyms")], word).slice(0, 12);
-  if (dm === undefined && dict === undefined) html += `<div class="dx-sec"><div class="dx-h">Thesaurus</div>${loading()}</div>`;
-  else if (syn.length || ant.length) {
-    html += `<div class="dx-sec"><div class="dx-h">Thesaurus <span class="dx-hint">· click a word to look it up</span></div>`;
-    if (syn.length) html += `<div class="dx-row"><span class="dx-lab">Synonyms</span><span class="dx-chips">${syn.map(chip).join("")}</span></div>`;
-    if (ant.length) html += `<div class="dx-row"><span class="dx-lab">Antonyms</span><span class="dx-chips">${ant.map(chip).join("")}</span></div>`;
-    html += `</div>`;
+  const thes = d.thes, groups = (thes && thes.groups) || {};
+  const row = (label, kind) => { const w = uniq(groups[kind] || [], word); return w.length ? `<div class="dx-row"><span class="dx-lab">${label}</span><span class="dx-chips">${w.map(chip).join("")}</span></div>` : ""; };
+  if (thes === undefined && def === undefined) html += `<div class="dx-sec"><div class="dx-h">Thesaurus</div>${loading()}</div>`;
+  else {
+    const rows = row("Synonyms", "synonyms") + row("Antonyms", "antonyms") + row("Broader", "broader") + row("Narrower", "narrower");
+    if (rows) html += `<div class="dx-sec"><div class="dx-h">Thesaurus <span class="dx-hint">· click a word to look it up</span></div>${rows}</div>`;
   }
 
-  const trg = uniq(dm && dm.trg || [], word).slice(0, 16);
-  if (trg.length) html += `<div class="dx-sec"><div class="dx-h">Related</div><div class="dx-chips">${trg.map(chip).join("")}</div></div>`;
+  const related = uniq((groups.related || []), word).slice(0, 16);
+  if (related.length) html += `<div class="dx-sec"><div class="dx-h">Related</div><div class="dx-chips">${related.map(chip).join("")}</div></div>`;
+
+  if (def && def.senses && def.senses.length) html += attributionNote(def.attribution, thes && thes.attribution);
 
   const wiki = SET.wiki ? d.wiki : null;
   if (wiki === undefined) html += `<div class="dx-sec"><div class="dx-h">Wikipedia</div>${loading()}</div>`;
@@ -204,8 +218,6 @@ function onClick(e) {
   const w = e.target.closest("[data-word]");
   if (w) { imageView = null; const word = w.getAttribute("data-word"); if (api) api.setInput(word); lookup(word, true); return; }
   if (e.target.closest('[data-act="back"]')) { if (history.length) { imageView = null; const p = history.pop(); if (api) api.setInput(p); lookup(p, false); } return; }
-  const au = e.target.closest("[data-audio]");
-  if (au) { try { new Audio(au.getAttribute("data-audio")).play(); } catch {} return; }
   if (e.target.closest('[data-act="toggle-wiki"]')) { SET.wiki = !SET.wiki; persistSettings(); cache = {}; render(false); return; }
   if (e.target.closest('[data-act="toggle-urban"]')) { SET.urban = !SET.urban; persistSettings(); cache = {}; render(false); return; }
 }
@@ -216,13 +228,14 @@ function toggleSettings() {
 }
 
 const HELP = `
-<p>Type a word — it's looked up across a dictionary, a thesaurus and Wikipedia (all keyless).
-<strong>Click any synonym, antonym or related word</strong> to look <em>it</em> up; <kbd>←</kbd> retraces your trail
-(the same wander-the-thesaurus feel as the colour lab).</p>
+<p>Type a word — it's looked up across our own dictionary/thesaurus service, plus Wikipedia
+(all keyless). <strong>Click any synonym, antonym, broader/narrower or related word</strong>
+to look <em>it</em> up; <kbd>←</kbd> retraces your trail (the same wander-the-thesaurus feel
+as the colour lab).</p>
 <h3>What you get</h3>
 <table class="help-keys">
-  <tr><td><kbd>definitions</kbd></td><td>by part of speech, with examples — and <kbd>▶</kbd> plays the pronunciation where available</td></tr>
-  <tr><td><kbd>thesaurus</kbd></td><td>synonyms, antonyms &amp; related words (Datamuse + the dictionary)</td></tr>
+  <tr><td><kbd>definitions</kbd></td><td>by part of speech, with examples and pronunciation, from our own lexicon</td></tr>
+  <tr><td><kbd>thesaurus</kbd></td><td>synonyms, antonyms, broader/narrower terms and related words — hundreds per word, not a handful</td></tr>
   <tr><td><kbd>wikipedia</kbd></td><td>a summary excerpt + image with a link, when an article exists — click the image to enlarge it</td></tr>
   <tr><td><kbd>⚙</kbd></td><td>toggle <strong>Wikipedia</strong> (on) and <strong>Urban Dictionary</strong> slang (off; user-submitted, can be explicit)</td></tr>
 </table>

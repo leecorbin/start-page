@@ -11,10 +11,12 @@ session) within this project** can build the ingest pipeline and functions from 
 is deliberately additive — start minimal, grow to comprehensive, never break the
 client contract.
 
-Status: **Phase 0 done**, **Phase 2's keyword-reverse gear done** (schema + full
-ingest + FTS5 reverse lookup, all verified — see [README.md](README.md) for proven
-results and exact numbers). Phase 1 (deploy) and Phase 2's vector gear not started.
-Sibling of `sync-worker/` (same Cloudflare account, same "client only ever knows
+Status: **Phase 0 and Phase 1 done and live** — deployed to
+`startpage-lexicon.leecorbin.workers.dev`, `plugins/dict.js` wired to it, Datamuse and
+dictionaryapi.dev both retired. Phase 2's keyword-reverse gear is built and verified
+locally but not yet indexed on remote D1 (hit the free-tier 500 MB limit — parked by
+choice, see [README.md](README.md)). Phase 2's vector gear not started. Sibling of
+`sync-worker/` (same Cloudflare account, same "client only ever knows
 `api.<brand>.uk`" pattern).
 
 > **Related but separate:** film/TV/people lookup is its **own plugin** (`plugins/`,
@@ -305,13 +307,17 @@ Route by input shape (extends today's plugin philosophy):
   `/pattern` `/rhyme` `/reverse` (Gear 1 — see §9) `/health` is written and its SQL
   verified against the dev database; `ingest/export-d1.js` batches the full dataset
   into D1-ready SQL and the round-trip (export → reload → identical row counts +
-  correct queries) is verified. **Not yet deployed** — that's Phase 1 (needs a real D1
-  database + Cloudflare Worker deploy + the domain; the import step itself is already
-  scripted, so Phase 1 is purely the Cloudflare/DNS setup + plugin wiring, not more
-  data engineering).
-- **Phase 1 — wire the plugin.** Point `??` at the API, input-shape routing, ship
-  crossword locally, drop Datamuse. *Acceptance:* the plugin is fully keyless and better
-  than today.
+  correct queries) is verified.
+- **Phase 1 — wire the plugin. ✅ DONE.** D1 database created and loaded (row counts
+  verified to match the dev DB exactly), Worker deployed to
+  `startpage-lexicon.leecorbin.workers.dev` (temporary — no brand/domain chosen yet).
+  `plugins/dict.js` now calls `/define` + `/thesaurus` directly; Datamuse *and*
+  dictionaryapi.dev both retired. Crossword/pattern still ships locally per the
+  original design (client-side, no API round-trip needed). *Acceptance met:* the
+  plugin is fully keyless and verified richer than before (60 displayed synonyms for
+  "happy" vs Datamuse's 14, plus new broader/narrower relations Datamuse never had).
+  One gap: `/dict/reverse`'s search index isn't built on remote D1 yet (hit the
+  free-tier 500 MB size limit) — parked by choice, see README.md.
 - **Phase 2 — semantic reverse.** Gear 1 (FTS5 keyword) **✅ DONE** — see §9 for verified
   wins (library, arachnophobia, nostalgia all rank #1) and honest, root-caused
   limitations (short-definition BM25 bias; phrasing mismatches like "one who" vs "a

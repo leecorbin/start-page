@@ -4,28 +4,41 @@ A self-hosted **dictionary + thesaurus + reverse-lookup + crossword** engine —
 data, our own Cloudflare functions, no API key, ever. Full design rationale, licensing,
 schema and phased plan: **[SPEC.md](SPEC.md)**.
 
-Why this exists: the `??` plugin's thesaurus currently calls Datamuse, which requires an
+Why this exists: the `??` plugin's thesaurus used to call Datamuse, which requires an
 API key from 1 Jan 2027. Rather than add a key (breaking the start page's keyless ethos),
-we're building the whole thing ourselves from open data — and it already shows **far
-richer results** than Datamuse ever did (see "Proven results" below).
+we built the whole thing ourselves from open data — **it's now live and wired up**, and
+shows **far richer results** than Datamuse ever did (see "Proven results" below).
 
 ## Status
 
 - ✅ **Phase 0 — schema + ingest.** Done and verified. All six sources, including the
-  **complete** Wiktextract dump (not a sample), ingest cleanly into a local
-  D1-compatible SQLite dev database; a keyless local crossword/pattern bundle is
-  emitted; a rhyme/sounds-like key is derived at ingest.
-- ⏳ **Phase 1 — wire the `??` plugin to a deployed Worker.** Not started — needs a
-  Cloudflare D1 database created + the Worker deployed (same one-time setup shape as
-  `sync-worker/`). The D1 import itself is already scripted and round-trip verified
-  (see below) — this phase is purely the Cloudflare account/DNS steps + plugin wiring.
-- ✅ **Phase 2, Gear 1 — keyword reverse lookup.** Done and verified: `GET
-  /dict/reverse` finds a word from a description via FTS5/BM25 over every gloss, no AI.
-  This is the actual "tip of your tongue" feature — the original ask this whole project
-  started from. See "Proven results" below for real wins *and* honest limitations.
+  **complete** Wiktextract dump (not a sample), ingest cleanly; a keyless local
+  crossword/pattern bundle is emitted; a rhyme/sounds-like key is derived at ingest.
+- ✅ **Phase 1 — deployed + wired up.** Live at
+  `https://startpage-lexicon.leecorbin.workers.dev` (temporary `.workers.dev` URL — no
+  brand/domain chosen yet; `api.<brand>.uk/dict/*` routing is a one-line swap once there
+  is one). D1 loaded with the full dataset (row counts verified to match the dev
+  database exactly). `plugins/dict.js` now calls `/define` and `/thesaurus` directly —
+  Datamuse **and** dictionaryapi.dev are both retired. `GET /dict/reverse` is deployed
+  but its FTS5 search index isn't built yet — see the size-limit note below; every other
+  route (`/define` `/thesaurus` `/pattern` `/rhyme` `/health`) is fully live.
+- ✅ **Phase 2, Gear 1 — keyword reverse lookup.** Built and verified **locally**
+  (`GET /dict/reverse` finds a word from a description via FTS5/BM25 over every gloss,
+  no AI — the actual "tip of your tongue" feature this project started from). **Not yet
+  live**: building the index on remote D1 hit the free-tier 500 MB database-size limit
+  (base data alone is ~532 MB). Parked by choice — see below — not a bug.
 - ⏳ **Phase 2, Gear 2 — semantic reverse lookup** (Vectorize + Workers AI). Not
   started — closes the gaps Gear 1's verification exposed.
 - ⏳ **Phase 3 — polish.** Not started (rhyme/sounds-like moved up — done in Phase 0).
+
+### The `/dict/reverse` index is parked on a real constraint, not forgotten
+
+Cloudflare D1's free tier caps a database at **500 MB**; Workers Paid ($5/month) raises
+that to 10 GB. Our base data (word/sense/rel/pron) alone is already **532 MB** — the
+FTS5 search index needs meaningfully more room on top. Decided to leave `/dict/reverse`
+unindexed for now (it returns `{"candidates":[]}` gracefully, no error) rather than
+either pay before it's needed or trim real content to fit. Revisit alongside the Gear 2
+decision, since Vectorize + Workers AI likely wants Workers Paid anyway.
 
 ## Data sources (all verified live, see SPEC.md §3–4 for licensing)
 
@@ -133,15 +146,17 @@ lexicon/
   bundle/              # generated local client asset (wordlist.txt) + NOTICE
 ```
 
-## Deploying (when ready for Phase 1)
+## Deploying
 
-Same shape as `sync-worker/`:
+Done once already (live at `startpage-lexicon.leecorbin.workers.dev`); these are the
+steps to redeploy after a data or code change, same shape as `sync-worker/`:
 
 ```bash
 node ../ingest/export-d1.js                     # writes worker/d1-import/*.sql from the dev DB
 cd worker
-npx wrangler login
-npx wrangler d1 create startpage-lexicon        # paste the printed database_id into wrangler.toml
+npx wrangler login                              # already authenticated, same account as sync-worker
+npx wrangler d1 create startpage-lexicon        # only for a fresh database — paste the printed
+                                                 # database_id into wrangler.toml (done: 5fd08903-...)
 npx wrangler d1 execute startpage-lexicon --remote --file=schema.sql
 for f in d1-import/*.sql; do
   npx wrangler d1 execute startpage-lexicon --remote --file="$f"
@@ -151,10 +166,14 @@ npx wrangler deploy
 ```
 
 (`d1-import/` isn't committed — it's generated output, regenerate it with
-`export-d1.js` right before deploying so it reflects the latest ingest run. The FTS5
-rebuild is a separate final step since `sense_fts` is a virtual table over `sense`,
-not a plain table with its own rows to import — untested against real D1 rather than
-local SQLite, so verify FTS5 is available there at deploy time.)
+`export-d1.js` right before deploying so it reflects the latest ingest run.)
+
+**Confirmed working against real D1:** schema load (including the `CREATE VIRTUAL
+TABLE ... USING fts5(...)` statement — D1 does support FTS5), all 59 data files (row
+counts verified to match the dev database exactly: 1,517,324 / 1,956,923 / 3,320,327 /
+272,161), and every route except the FTS5 rebuild — that one hit the free-tier 500 MB
+size limit (base data is already ~532 MB) and is parked, not broken. See the Status
+section above.
 
 ## Licensing
 

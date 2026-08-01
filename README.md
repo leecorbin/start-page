@@ -165,10 +165,12 @@ from here see a direct visit rather than your start page's address.
     **Text:** anything else you type gets every **case** (UPPER, lower, Title,
     Sentence, camel, Pascal, snake, kebab, CONSTANT), a **slug**, reverse, trim, and
     **counts** (chars/words/lines/bytes). All click-to-copy.
-  - 📖 **Dictionary** (`??`) — type a word for **definitions** + IPA + a **▶ play**
-    pronunciation, a **thesaurus** (synonyms / antonyms / related), and a
-    **Wikipedia** excerpt with image — all keyless (dictionaryapi.dev, Datamuse,
-    Wikipedia REST). **Click any word to look it up** and `←` to retrace, like the
+  - 📖 **Dictionary** (`??`) — type a word for **definitions** + IPA, an **extensive
+    thesaurus** (synonyms / antonyms / broader / narrower / related — hundreds of
+    results, not a handful), and a **Wikipedia** excerpt with image. Definitions and
+    thesaurus come from our own self-hosted **[lexicon service](lexicon/)** — own data
+    (Wiktionary + WordNet + Moby + CMUdict), own Cloudflare Worker, still fully
+    keyless to you. **Click any word to look it up** and `←` to retrace, like the
     colour lab; **click the Wikipedia image** to enlarge it in the box. A ⚙ panel
     toggles **Wikipedia** (on) and **Urban Dictionary** slang (off by default).
     Debounced and cached.
@@ -238,8 +240,11 @@ bar, with full history/autocomplete.)
 
 ## Also in this repo
 
-Two optional companions live alongside the page. Neither is required — the start
-page is complete on its own — and each has its own README.
+Three companions live alongside the page, each with its own README. `mac-launcher/`
+and `sync-worker/` are genuinely optional — the start page is complete without them.
+`lexicon/` is what the `??` Dictionary plugin now talks to for definitions and its
+thesaurus (Wikipedia stays separate); point `startpage:dictApi` in `localStorage` at
+your own deploy, or a self-hosted copy just won't have that plugin's data until you do.
 
 - 🖥️ **[`mac-launcher/`](mac-launcher/)** — a tiny macOS **menu-bar quick-launcher**
   that pops the start page in a floating window on a global hotkey (default
@@ -252,6 +257,12 @@ page is complete on its own — and each has its own README.
   it only ever sees ciphertext, holds no keys or secrets, and does last-write-wins
   with a compare-and-swap revision check and a retention TTL. Deploy your own with
   `npx wrangler deploy` and point the page at it in one line.
+- 📖 **[`lexicon/`](lexicon/)** — a self-hosted **dictionary + thesaurus** engine:
+  our own copy of open lexical data (Wiktionary, WordNet, Moby, CMUdict) in a
+  Cloudflare D1 database behind a keyless Worker. Built to replace a
+  soon-key-gated third party, and ends up far richer in the process — hundreds of
+  thesaurus results per word instead of a dozen, plus broader/narrower relations
+  no other keyless source offered.
 
 ## Compliance / data
 
@@ -268,7 +279,7 @@ page is complete on its own — and each has its own README.
   - We deliberately **do not** embed an Unsplash/Pexels API key or proxy through
     anyone else's backend — that would breach those APIs' terms.
 - Local-folder mode is fully offline.
-- Plugins use only **keyless** providers too: dictionaryapi.dev, Datamuse and
+- Plugins use only **keyless** providers too: our own [lexicon service](lexicon/) and
   Wikipedia (dictionary); Wikidata and Wikipedia (screen — films/TV/people); Openverse
   and Wikimedia Commons (images); Open-Meteo geocoding and OpenStreetMap / CARTO tiles
   (map — CARTO basemaps are OSM-data and keyless); BigDataCloud reverse geocoding (to

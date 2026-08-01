@@ -1,4 +1,5 @@
 data/
+worker/d1-import/
 .wrangler/
 node_modules/
 .dev.vars

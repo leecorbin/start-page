@@ -11,9 +11,16 @@
  *   GET /dict/thesaurus?w=<word>           -> { word, groups{}, attribution }
  *   GET /dict/pattern?p=F?SH&max=50        -> { pattern, matches[], attribution }  (usually answered locally; parity/rare-word fallback)
  *   GET /dict/rhyme?w=<word>&max=50        -> { word, rhymeKey, matches[], attribution }
+ *   GET /dict/reverse?q=<description>&max=20&sp=<optional pattern>
+ *                                           -> { query, candidates[], engine, attribution }
  *   GET /dict/health                       -> { ok, counts }
  *
- * Semantic /dict/reverse (Vectorize + Workers AI) is Phase 2 — not implemented yet.
+ * /dict/reverse is Gear 1 only (FTS5 keyword/BM25 over sense.gloss — SPEC.md §9):
+ * describe a word, find it, no AI. Good for concrete descriptions that share real
+ * vocabulary with a definition ("a place where books are kept" -> library, "fear of
+ * spiders" -> arachnophobia, both rank #1 — verified). Weaker for abstract phrasing
+ * that doesn't literally overlap with how a word is defined — that gap is exactly
+ * what Gear 2 (Vectorize + Workers AI, Phase 2) is for, not a bug here.
  */
 
 const CORS = {
@@ -119,6 +126,47 @@ async function pattern(db, p, max) {
   return json({ pattern: p, matches: rows.map((r) => r.word), attribution: attributionFor(["moby"]) });
 }
 
+const STOPWORDS = new Set(("a an the of to in on for with is are was were that which it its as or and be being been " +
+  "having has have had do does did at by from this these those i you he she they we").split(" "));
+
+// Builds an FTS5 query: significant terms OR'd together, each quoted so stray
+// punctuation in free text can't break MATCH syntax.
+function reverseQuery(q) {
+  const terms = (q || "").toLowerCase().match(/[a-z']+/g) || [];
+  const significant = [...new Set(terms.filter((t) => t.length > 1 && !STOPWORDS.has(t)))];
+  return significant.map((t) => `"${t.replace(/"/g, '""')}"`).join(" OR ");
+}
+
+function patternRegex(p) {
+  const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*").replace(/\\\?/g, ".");
+  return new RegExp(`^${escaped}$`, "i");
+}
+
+async function reverse(db, q, max, sp) {
+  const fts = reverseQuery(q);
+  if (!fts) return json({ query: q, candidates: [], engine: "keyword", attribution: [] });
+
+  // over-fetch raw sense hits (bm25 can't be combined with GROUP BY/window functions
+  // in SQLite's FTS5), then dedupe-by-word and cap in JS
+  const rows = (await db.prepare(
+    `SELECT w.word AS word, s.gloss AS gloss, s.pos AS pos, s.source AS source, bm25(sense_fts) AS score
+     FROM sense_fts JOIN sense s ON s.id = sense_fts.rowid JOIN word w ON w.id = s.word_id
+     WHERE sense_fts MATCH ? ORDER BY bm25(sense_fts) LIMIT 300`
+  ).bind(fts).all()).results;
+
+  const re = sp ? patternRegex(sp) : null;
+  const seen = new Set(), candidates = [], sources = new Set();
+  const wanted = Math.min(Math.max(Number(max) || 20, 1), 60);
+  for (const r of rows) {
+    if (seen.has(r.word)) continue;
+    if (re && !re.test(r.word)) continue;
+    seen.add(r.word); sources.add(r.source);
+    candidates.push({ word: r.word, gloss: r.gloss, pos: r.pos, score: r.score });
+    if (candidates.length >= wanted) break;
+  }
+  return json({ query: q, candidates, engine: "keyword", attribution: attributionFor(sources) });
+}
+
 async function health(db) {
   const count = async (table) => (await db.prepare(`SELECT COUNT(*) n FROM ${table}`).first()).n;
   return json({
@@ -139,6 +187,7 @@ export default {
     if (parts[1] === "thesaurus") return thesaurus(env.DB, url.searchParams.get("w"));
     if (parts[1] === "pattern") return pattern(env.DB, url.searchParams.get("p"), url.searchParams.get("max"));
     if (parts[1] === "rhyme") return rhyme(env.DB, url.searchParams.get("w"), url.searchParams.get("max"));
+    if (parts[1] === "reverse") return reverse(env.DB, url.searchParams.get("q"), url.searchParams.get("max"), url.searchParams.get("sp"));
     if (parts[1] === "health") return health(env.DB);
     return json({ error: "not_found" }, 404);
   },

@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS pron (
 CREATE INDEX IF NOT EXISTS pron_word ON pron(word_id);
 CREATE INDEX IF NOT EXISTS pron_rhyme ON pron(rhyme_key);
 
+-- full-text index over sense.gloss — the "keyword gear" of the reverse-dictionary
+-- lookup (SPEC.md §9): describe a word, find it, no AI required. External-content
+-- table (indexes `sense` in place, no duplicated storage); rebuild after loading/
+-- changing sense data with:  INSERT INTO sense_fts(sense_fts) VALUES('rebuild');
+CREATE VIRTUAL TABLE IF NOT EXISTS sense_fts USING fts5(gloss, content='sense', content_rowid='id');
+
 -- one row per ingest run, so we can tell what's loaded and re-run safely
 CREATE TABLE IF NOT EXISTS ingest_log (
   source    TEXT PRIMARY KEY,

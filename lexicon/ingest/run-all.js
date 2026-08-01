@@ -5,7 +5,7 @@ const path = require("node:path");
 const { openDb, wordStore, logIngest } = require("./lib/db");
 
 const DB_PATH = path.join(__dirname, "../data/lexicon.dev.sqlite");
-const SOURCES = ["01-wordlist", "02-thesaurus", "03-wordnet", "04-cmudict", "05-frequency", "06-wiktextract"];
+const SOURCES = ["01-wordlist", "02-thesaurus", "03-wordnet", "04-cmudict", "05-frequency", "06-wiktextract", "07-reverse-index"];
 
 async function main() {
   const db = openDb(DB_PATH);

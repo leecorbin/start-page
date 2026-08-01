@@ -19,8 +19,13 @@ richer results** than Datamuse ever did (see "Proven results" below).
   Cloudflare D1 database created + the Worker deployed (same one-time setup shape as
   `sync-worker/`). The D1 import itself is already scripted and round-trip verified
   (see below) — this phase is purely the Cloudflare account/DNS steps + plugin wiring.
-- ⏳ **Phase 2 — semantic reverse lookup** (Vectorize + Workers AI). Not started.
-- ⏳ **Phase 3 — polish.** Not started.
+- ✅ **Phase 2, Gear 1 — keyword reverse lookup.** Done and verified: `GET
+  /dict/reverse` finds a word from a description via FTS5/BM25 over every gloss, no AI.
+  This is the actual "tip of your tongue" feature — the original ask this whole project
+  started from. See "Proven results" below for real wins *and* honest limitations.
+- ⏳ **Phase 2, Gear 2 — semantic reverse lookup** (Vectorize + Workers AI). Not
+  started — closes the gaps Gear 1's verification exposed.
+- ⏳ **Phase 3 — polish.** Not started (rhyme/sounds-like moved up — done in Phase 0).
 
 ## Data sources (all verified live, see SPEC.md §3–4 for licensing)
 
@@ -66,6 +71,29 @@ Datamuse today:
   results — so Phase 1's D1 import is a mechanical
   `for f in d1-import/*.sql; do wrangler d1 execute ... --file="$f"; done`, not an open
   question.
+
+### Reverse lookup ("tip of your tongue") — the actual original ask, now working
+
+`GET /dict/reverse?q=<description>` — describe a word, get candidates back, no AI.
+Real queries against the full dataset:
+
+- **"a place where books are kept" → library** ranks #1.
+- **"fear of spiders" → arachnophobia** ranks #1 — confirmed independently by both a
+  WordNet and a Wiktionary sense.
+- **"intense longing for the past" → nostalgia** ranks #1 — the exact style of query
+  the original Reader's Digest *Reverse Dictionary* was built around.
+
+Two honest, root-caused limitations (not bugs — this is what plain keyword search
+*can't* do, and precisely the gap Gear 2/semantic embeddings will close):
+- **Short-definition bias:** "ringing in the ears" surfaces "singing" ("A ringing
+  sound in the ears") ahead of the correct **tinnitus**, because BM25's length
+  normalisation rewards terser documents regardless of correctness. Frequency-blended
+  ranking was tried and rejected here — both words happen to share `freq = 0`, so it
+  doesn't discriminate between them, and it actively over-promotes loosely-related
+  common words on other queries. Shipped unblended rather than fake a fix.
+- **Phrasing mismatch:** "a person who studies stars" doesn't strongly surface
+  **astronomer**, because its Wiktionary gloss reads *"One who studies..."* — it
+  never contains the literal word "person" at all.
 
 ## Running the ingest
 
@@ -118,11 +146,15 @@ npx wrangler d1 execute startpage-lexicon --remote --file=schema.sql
 for f in d1-import/*.sql; do
   npx wrangler d1 execute startpage-lexicon --remote --file="$f"
 done
+npx wrangler d1 execute startpage-lexicon --remote --command="INSERT INTO sense_fts(sense_fts) VALUES('rebuild')"
 npx wrangler deploy
 ```
 
 (`d1-import/` isn't committed — it's generated output, regenerate it with
-`export-d1.js` right before deploying so it reflects the latest ingest run.)
+`export-d1.js` right before deploying so it reflects the latest ingest run. The FTS5
+rebuild is a separate final step since `sense_fts` is a virtual table over `sense`,
+not a plain table with its own rows to import — untested against real D1 rather than
+local SQLite, so verify FTS5 is available there at deploy time.)
 
 ## Licensing
 

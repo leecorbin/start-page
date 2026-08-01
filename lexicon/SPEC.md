@@ -11,9 +11,11 @@ session) within this project** can build the ingest pipeline and functions from 
 is deliberately additive — start minimal, grow to comprehensive, never break the
 client contract.
 
-Status: **Phase 0 done** (schema + ingest, verified — see [README.md](README.md) for
-proven results and exact numbers). Phases 1–3 not started. Sibling of `sync-worker/`
-(same Cloudflare account, same "client only ever knows `api.<brand>.uk`" pattern).
+Status: **Phase 0 done**, **Phase 2's keyword-reverse gear done** (schema + full
+ingest + FTS5 reverse lookup, all verified — see [README.md](README.md) for proven
+results and exact numbers). Phase 1 (deploy) and Phase 2's vector gear not started.
+Sibling of `sync-worker/` (same Cloudflare account, same "client only ever knows
+`api.<brand>.uk`" pattern).
 
 > **Related but separate:** film/TV/people lookup is its **own plugin** (`plugins/`,
 > keyless Wikidata/WDQS — see the screen-lookup design), not part of this lexicon
@@ -145,10 +147,16 @@ CREATE TABLE pron (
 );
 CREATE INDEX pron_word ON pron(word_id);
 CREATE INDEX pron_rhyme ON pron(rhyme_key);
+
+-- full-text index over sense.gloss — Gear 1 of the reverse lookup (§9). External-
+-- content table (indexes `sense` in place); rebuild after loading/changing sense
+-- data with:  INSERT INTO sense_fts(sense_fts) VALUES('rebuild');
+CREATE VIRTUAL TABLE sense_fts USING fts5(gloss, content='sense', content_rowid='id');
 ```
 
-Vectorize: one vector per `sense.id` (metadata: `word_id`, `word`, short gloss, `freq`)
-so a reverse hit maps straight back to a headword + gloss for display and re-ranking.
+Vectorize (Gear 2, not yet built): one vector per `sense.id` (metadata: `word_id`,
+`word`, short gloss, `freq`) so a reverse hit maps straight back to a headword + gloss
+for display and re-ranking.
 
 ## 7. Ingest pipeline (`lexicon/ingest/`)
 
@@ -216,15 +224,44 @@ Notes:
 
 Ship it in two gears so it's useful from day one:
 
-- **Gear 1 (keyword / gloss match):** BM25-ish search over `sense.gloss` (D1 FTS5). No AI,
-  instant, decent for concrete descriptions — this is essentially the original Reverse
-  Dictionary book. `engine:"keyword"`.
-- **Gear 2 (vector):** embed the query with Workers AI → Vectorize ANN search → map hits to
-  headwords. **Blend** the vector score with `word.freq` so common words outrank obscure
-  ones. `engine:"vector"`. Cache `q → results` in KV (normalise `q`) so repeats cost nothing.
+- **Gear 1 (keyword / gloss match). ✅ BUILT & VERIFIED.** FTS5 full-text index over
+  `sense.gloss` (external-content table, rebuilt at ingest — `07-reverse-index.js`),
+  queried via BM25 in `GET /dict/reverse`. No AI, instant. `engine:"keyword"`.
+
+  **Verified wins** (real queries against the full dataset, each ranking **#1**):
+  "a place where books are kept" → **library**; "fear of spiders" → **arachnophobia**
+  (confirmed independently by WordNet *and* Wiktionary); "intense longing for the past"
+  → **nostalgia** — the exact kind of query the original Reader's Digest Reverse
+  Dictionary was built for.
+
+  **Verified, honest limitations** — both root-caused, not mysterious:
+  - *Short-definition bias:* "ringing in the ears" → BM25 favours **"singing"** ("A
+    ringing sound in the ears") over the correct **tinnitus** ("a ringing or booming
+    sensation in one or both ears...") purely because BM25's length-normalisation
+    rewards terser documents. Frequency-blending was tried and **rejected** — it
+    doesn't discriminate here (both candidate words happen to share `freq = 0`) and it
+    actively hurts other queries by over-promoting loosely-related common words. Left
+    unblended (plain BM25) rather than ship an unvalidated heuristic.
+  - *Phrasing mismatch:* "a person who studies stars" doesn't rank **astronomer**
+    highly, because its Wiktionary gloss says *"One who studies..."*, not literally
+    "person" — it misses that keyword entirely and loses to terser definitions using
+    "A person who studies X" verbatim.
+
+  Both failure modes are exactly what keyword matching *can't* do — understand that
+  "one who" ≈ "a person who", or that a fuller clinical definition and a terser slang
+  one describe the same underlying concept. That gap is precisely Gear 2's job, not a
+  bug in Gear 1.
+- **Gear 2 (vector).** Not started. Embed the query with Workers AI → Vectorize ANN
+  search → map hits to headwords. **Blend** the vector score with `word.freq` so common
+  words outrank obscure ones (this blending makes more sense here than it did for Gear
+  1 — vector similarity doesn't have BM25's short-document bias, so a plain frequency
+  bonus isn't fighting an opposing effect). `engine:"vector"`. Cache `q → results` in KV
+  (normalise `q`) so repeats cost nothing.
 
 Upgrade path: bge-small → bge-base (768-dim) if quality needs it; re-embed corpus, swap the
-Vectorize index. Client never changes.
+Vectorize index. Client never changes — `/dict/reverse` already returns `engine` per
+response, so the client can show "keyword match" vs "smart match" without caring which
+gear actually served it.
 
 ## 10. Access control / guards
 
@@ -265,20 +302,23 @@ Route by input shape (extends today's plugin philosophy):
   broader/narrower/antonym relations Datamuse never exposed, `F?SH`/`J*CK` pattern
   matching and rhyme lookups (night → right/might/tonight/quite/fight…) work fully
   offline. A Worker (`worker/src/worker.js`) implementing `/define` `/thesaurus`
-  `/pattern` `/rhyme` `/health` is written and its SQL verified against the dev
-  database; `ingest/export-d1.js` batches the full dataset into D1-ready SQL and the
-  round-trip (export → reload → identical row counts + correct queries) is verified.
-  **Not yet deployed** — that's Phase 1 (needs a real D1 database + Cloudflare Worker
-  deploy + the domain; the import step itself is already scripted, so Phase 1 is purely
-  the Cloudflare/DNS setup + plugin wiring, not more data engineering).
+  `/pattern` `/rhyme` `/reverse` (Gear 1 — see §9) `/health` is written and its SQL
+  verified against the dev database; `ingest/export-d1.js` batches the full dataset
+  into D1-ready SQL and the round-trip (export → reload → identical row counts +
+  correct queries) is verified. **Not yet deployed** — that's Phase 1 (needs a real D1
+  database + Cloudflare Worker deploy + the domain; the import step itself is already
+  scripted, so Phase 1 is purely the Cloudflare/DNS setup + plugin wiring, not more
+  data engineering).
 - **Phase 1 — wire the plugin.** Point `??` at the API, input-shape routing, ship
   crossword locally, drop Datamuse. *Acceptance:* the plugin is fully keyless and better
   than today.
-- **Phase 2 — semantic reverse.** FTS5 keyword gear, then Vectorize + Workers AI gear with
-  KV cache and freq-blended ranking. *Acceptance:* "belonging to the wrong era" → surfaces
-  *anachronistic*; `sp=` narrows.
-- **Phase 3 — polish.** Bigger embedding model if needed, examples, rhyme/sounds-like from
-  CMUdict, tuning, aggressive caching, optional public-API guards.
+- **Phase 2 — semantic reverse.** Gear 1 (FTS5 keyword) **✅ DONE** — see §9 for verified
+  wins (library, arachnophobia, nostalgia all rank #1) and honest, root-caused
+  limitations (short-definition BM25 bias; phrasing mismatches like "one who" vs "a
+  person who"). Gear 2 (Vectorize + Workers AI, KV cache, freq-blended ranking) not
+  started — closes exactly the gap Gear 1's limitations expose.
+- **Phase 3 — polish.** Bigger embedding model if needed, examples, tuning, aggressive
+  caching, optional public-API guards. (Rhyme/sounds-like moved up — done in Phase 0.)
 
 ## 13. Cost model
 

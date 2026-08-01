@@ -191,11 +191,25 @@ from here see a direct visit rather than your start page's address.
     extra landscape space. Keyboard-driven (arrows / WASD, space to drop or launch);
     Back / Pause / Restart sit on the search box, `esc` steps back to the menu.
     Jump straight in with `::snake`, `::2048` or `::tetris`. Best scores save locally.
+  - 🎬 **Screen** (`**`) — keyless **film / TV / people** lookup. Type a title or name
+    and pick from the matches (each disambiguated — "2017 film" vs "soundtrack album");
+    get director, **clickable cast**, genres, runtime, **ratings** (🍅 Rotten Tomatoes,
+    ⭐ IMDb, Ⓜ Metacritic — wherever Wikidata has them) with **IMDb / Rotten Tomatoes**
+    links, and a Wikipedia plot excerpt. **Full cast &amp; crew →** opens the complete
+    list with **headshots and the character played**, plus crew (director, writer,
+    composer, cinematographer, editor…). A person's page shows a photo, a bio, and
+    their **filmography split into Films and Television**, newest first. **Click
+    anyone or anything to follow it** — cast → filmography → a film → its cast → …
+    — `←` retraces, the same wander-the-graph feel as the dictionary. All from
+    [Wikidata](https://www.wikidata.org) (CC0) + Wikipedia — no API key, no backend.
+    Film posters are usually missing from Wikidata (they're copyrighted; Commons is
+    free-media only) — open IMDb for artwork; people's headshots are present.
 - ❓ **Help popup** (`⌘/`) — a low-key summary of what's here and the full keyboard
   shortcut list, including your custom searches.
 - ⚙️ **Settings panel** (gear, bottom-right): background source, change frequency
   (every tab / hourly / daily / never), the new-images mix, default & per-favourite
-  image look, weather, quick links, and more. Settings persist in `localStorage`.
+  image look, weather, quick links, and more — with its own **close button** (and `esc`)
+  so it's always dismissable, sidebar or full-width. Settings persist in `localStorage`.
 
 ## Use it as your browser start page
 
@@ -255,10 +269,10 @@ page is complete on its own — and each has its own README.
     anyone else's backend — that would breach those APIs' terms.
 - Local-folder mode is fully offline.
 - Plugins use only **keyless** providers too: dictionaryapi.dev, Datamuse and
-  Wikipedia (dictionary); Openverse and Wikimedia Commons (images); Open-Meteo
-  geocoding and OpenStreetMap / CARTO tiles (map — CARTO basemaps are OSM-data and
-  keyless); BigDataCloud reverse geocoding (to name your location for the weather).
-  No API keys, no proxy backends, no Google.
+  Wikipedia (dictionary); Wikidata and Wikipedia (screen — films/TV/people); Openverse
+  and Wikimedia Commons (images); Open-Meteo geocoding and OpenStreetMap / CARTO tiles
+  (map — CARTO basemaps are OSM-data and keyless); BigDataCloud reverse geocoding (to
+  name your location for the weather). No API keys, no proxy backends, no Google.
 - [Leaflet](https://leafletjs.com) (BSD-2-Clause) is **vendored** under
   `plugins/vendor/` and served from your own origin — never a CDN at runtime.
 - Ships with `<meta name="robots" content="noindex, nofollow">` so a hosted copy

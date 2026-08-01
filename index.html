@@ -244,6 +244,10 @@
   /* settings panel */
   #panel { position: fixed; top: 0; right: 0; height: 100%; width: min(360px, 88vw); z-index: 4; background: var(--panel-bg); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-left: 1px solid rgba(255,255,255,0.10); box-shadow: -20px 0 60px rgba(0,0,0,0.4); transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); overflow-y: auto; padding: 1.4rem 1.3rem 2rem; color: var(--fg); }
   #panel.open { transform: none; }
+  #panel .panel-hd { display: flex; align-items: stretch; gap: 0.5rem; margin-bottom: 1.2rem; position: sticky; top: 0; z-index: 5; background: var(--panel-bg); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); }
+  #panel .panel-hd .tabs { flex: 1; margin-bottom: 0; }
+  #panel-close { flex: none; width: 44px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--field-border); background: rgba(130,130,140,0.18); color: var(--fg); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+  #panel-close:hover { background: rgba(130,130,140,0.32); }
   #panel h2 { margin: 0 0 1rem; font-size: 1.05rem; font-weight: 500; }
   .tabs { display: flex; gap: 0.3rem; margin-bottom: 1.2rem; background: rgba(255,255,255,0.06); padding: 0.25rem; border-radius: 10px; }
   .tab { flex: 1; background: none; border: none; color: var(--muted); font: inherit; font-size: 0.88rem; padding: 0.45rem; border-radius: 7px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
@@ -443,9 +447,12 @@
   </div>
 
   <aside id="panel" aria-label="Settings panel">
-    <div class="tabs">
-      <button class="tab active" id="tab-btn-settings">Settings</button>
-      <button class="tab" id="tab-btn-links">Shortcuts</button>
+    <div class="panel-hd">
+      <div class="tabs">
+        <button class="tab active" id="tab-btn-settings">Settings</button>
+        <button class="tab" id="tab-btn-links">Shortcuts</button>
+      </div>
+      <button id="panel-close" type="button" title="Close settings" aria-label="Close settings">×</button>
     </div>
     <div class="tabpane" id="tab-settings">
 
@@ -989,7 +996,7 @@ input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 
 /* Bump on every deploy that changes a plugin — appended to plugin import URLs
    so browsers fetch the new code instead of a hard-cached ES module. */
-const APP_VERSION = "2026.06.15c";
+const APP_VERSION = "2026.07.31d";
 
 /* True when opened inside the mac quick-launcher (it loads us with ?launcher=1).
    A hook for launcher-aware behaviour — currently: Esc closes the popup once
@@ -1012,6 +1019,7 @@ const PLUGINS = [
   { id: "img", trigger: "[]", title: "Images", icon: "▦", iconify: "lucide:image", height: 120, src: "./plugins/img.js" },
   { id: "map", trigger: "@@", title: "Map", icon: "@", iconify: "lucide:map-pin", height: 120, src: "./plugins/map.js" },
   { id: "arcade", trigger: "::", title: "Arcade", icon: "🕹", iconify: "lucide:gamepad-2", height: 300, src: "./plugins/arcade.js" },
+  { id: "screen", trigger: "**", title: "Screen", icon: "★", iconify: "lucide:clapperboard", height: 120, src: "./plugins/screen.js" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");
@@ -2225,6 +2233,8 @@ function switchTab(name) {
 $("tab-btn-settings").onclick = () => switchTab("settings");
 $("tab-btn-links").onclick = () => switchTab("links");
 $("gear").onclick = (e) => { e.stopPropagation(); closeTune(); panel.classList.toggle("open"); if (panel.classList.contains("open")) probeLocalOnce(); };
+$("panel-close").onclick = closePanel;
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && panel.classList.contains("open") && $("help").hidden && !activePlugin) { e.stopPropagation(); closePanel(); } }, true);   // Esc also dismisses settings
 // Keep clicks inside the panel from reaching the "click-outside closes" handler.
 // (Reorder/delete rebuild the editor and detach the clicked node, which would
 // otherwise read as an outside click and dismiss the panel.)

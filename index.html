@@ -13,6 +13,7 @@
   Copyright (c) 2026 Lee Corbin. MIT License (see LICENSE).
   No tracking, no API keys, no server. Keyless providers only.
 -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="preconnect" href="https://picsum.photos" crossorigin />
 <link rel="preconnect" href="https://fastly.picsum.photos" crossorigin />
 <link rel="preconnect" href="https://api.iconify.design" crossorigin />
@@ -41,6 +42,26 @@
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     min-height: 100vh; overflow: hidden; -webkit-font-smoothing: antialiased;
   }
+  /* "Home layout" (default): clock/greeting/weather above, hints/quick-links/plugin-icons below,
+     omnibox centered between them — right for the empty state and the suggest dropdown. "Panel
+     layout": both collapse out of the way together and the centered block's own content (the
+     omnibox + the plugin panel) grows to fill the space they used. Three independent reasons can
+     trigger it (see updatePanelLayout): the active plugin always wants it (dock: "always"), the
+     active plugin's content has grown past the home-layout cap (dock: "auto"), or the window
+     itself is too short for home layout regardless of which plugin is open — the original reason
+     this existed, kept as a safety net under the other two.
+     Deliberately NOT done by switching justify-content (center → flex-start): that's a discrete,
+     unanimatable property — flipping it recalculates the whole column's position in a single
+     frame, before any child's own transition has moved at all, which reads as an instant jump
+     with a smooth animation stacked awkwardly after it. Staying centered permanently and letting
+     the above/below blocks collapse to nothing is what makes the whole thing a single continuous
+     motion: the browser recomputes the centered position every frame as a natural side effect of
+     the children's own opacity/max-height transitions, with nothing to jump. The corner controls
+     (#controls, #credit) are deliberately untouched by any of this — they stay rooted to the
+     viewport corners regardless of layout state. */
+  .above-box, .below-box { display: flex; flex-direction: column; align-items: center; overflow: hidden; max-height: 500px; transition: opacity 0.18s ease, max-height 0.3s ease 0.12s, margin 0.3s ease 0.12s; }
+  .below-box { margin-top: 1.7rem; gap: 1.0rem; }
+  body.panel-layout .above-box, body.panel-layout .below-box { max-height: 0; opacity: 0; margin: 0; pointer-events: none; }
 
   #bg { position: fixed; inset: -40px; background-size: cover; background-position: center; opacity: 0; transform: scale(1.06); transition: opacity 0.9s ease; z-index: 0; }
   #bg.loaded { opacity: 1; }
@@ -50,6 +71,11 @@
 
   .content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; animation: rise 0.6s ease both; transition: color 0.4s ease; }
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .brandmark { width: 30px; height: 30px; margin-bottom: 0.7rem; color: var(--fg); opacity: 0.5; filter: drop-shadow(0 1px 8px rgba(0,0,0,0.25)); }
+  .brandmark svg { width: 100%; height: 100%; display: block; }
+  .brandmark path { fill: currentColor; }
+  body.lc-light .brandmark { color: #15181f; filter: drop-shadow(0 1px 6px rgba(255,255,255,0.5)); }
 
   .clock { font-size: clamp(3rem, 11vw, 7rem); font-weight: 200; letter-spacing: -0.02em; line-height: 1; font-variant-numeric: tabular-nums; text-shadow: var(--halo); }
   .clock[hidden] { display: none; }
@@ -127,7 +153,7 @@
   .hints kbd { font-family: ui-monospace, "SF Mono", Menlo, monospace; background: rgba(255,255,255,0.14); border-radius: 5px; padding: 0.05rem 0.35rem; }
 
   /* quick links */
-  #links { margin-top: 1.7rem; display: flex; gap: 1.0rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
+  #links { display: flex; gap: 1.0rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
   #links[hidden] { display: none; }
   #links a { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; text-decoration: none; transition: transform 0.15s ease, background 0.15s ease; }
   .ql-tip { position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%) translateY(4px); background: rgb(18,22,30); color: #fff; font-size: 0.72rem; white-space: nowrap; padding: 0.3rem 0.6rem; border-radius: 9px; pointer-events: none; opacity: 0; transition: opacity 0.16s ease, transform 0.16s ease; border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 24px rgba(0,0,0,0.45); z-index: 7; }
@@ -153,7 +179,7 @@
   #links.size-large .ql-mono { width: 42px; height: 42px; font-size: 19px; }
   #links.size-large .ql-glyph { font-size: 36px; }
 
-  #frequent { margin-top: 1.0rem; display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
+  #frequent { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
   #frequent[hidden] { display: none; }
   .freq-item { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; text-decoration: none; opacity: 0.62; transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease; }
   .freq-item:hover { opacity: 1; background: rgba(255,255,255,0.08); transform: translateY(-2px); }
@@ -163,7 +189,7 @@
   .freq-del { position: absolute; top: -5px; right: -5px; width: 15px; height: 15px; padding: 0; border: none; border-radius: 50%; background: rgba(18,22,30,0.95); color: #fff; font-size: 11px; line-height: 1; cursor: pointer; display: none; place-items: center; }
   .freq-item:hover .freq-del { display: grid; }
   .freq-del:hover { background: #d9534f; }
-  #plugin-bar { margin-top: 1.0rem; display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
+  #plugin-bar { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; max-width: min(620px, 88vw); }
   #plugin-bar[hidden] { display: none; }
   .plug-item { position: relative; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: none; background: none; border-radius: 9px; cursor: pointer; opacity: 0.62; transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease; }
   .plug-item:hover { opacity: 1; background: rgba(255,255,255,0.08); transform: translateY(-2px); }
@@ -195,6 +221,8 @@
   #credit a:hover { color: #fff; }
   body.bl-light #credit { color: #1c1f26; text-shadow: 0 1px 8px rgba(255,255,255,0.6); }
   body.bl-light #credit a { border-bottom-color: rgba(0,0,0,0.3); }
+
+  #build-stamp { text-align: center; margin-top: 0.7rem; font-size: 0.7rem; font-variant-numeric: tabular-nums; color: var(--muted, rgba(244,246,251,0.6)); }
 
   #controls { position: fixed; right: 14px; bottom: 12px; z-index: 3; display: flex; gap: 4px; }
   .ctl { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,0.55); cursor: pointer; opacity: 0.4; transition: opacity 0.2s ease, background 0.2s ease, color 0.3s ease; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.5)); }
@@ -245,10 +273,15 @@
   /* settings panel */
   #panel { position: fixed; top: 0; right: 0; height: 100%; width: min(360px, 88vw); z-index: 4; background: var(--panel-bg); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); border-left: 1px solid rgba(255,255,255,0.10); box-shadow: -20px 0 60px rgba(0,0,0,0.4); transform: translateX(100%); transition: transform 0.32s cubic-bezier(0.4,0,0.2,1); overflow-y: auto; padding: 1.4rem 1.3rem 2rem; color: var(--fg); }
   #panel.open { transform: none; }
-  #panel .panel-hd { display: flex; align-items: stretch; gap: 0.5rem; margin-bottom: 1.2rem; position: sticky; top: 0; z-index: 5; background: var(--panel-bg); backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4); }
+  /* Same translucent fill as the panel (needed so scrolled rows don't visibly
+     slide through the sticky header) but NO backdrop-filter of its own — it sits
+     on the panel's already-blurred backdrop, so a second blur+saturate(1.4) here
+     only compounds the saturation (~1.4× becomes ~2×), reading as a murky,
+     over-solid patch rather than blending in as the same glass. */
+  #panel .panel-hd { display: flex; align-items: stretch; gap: 0.5rem; margin-bottom: 1.2rem; position: sticky; top: 0; z-index: 5; background: var(--panel-bg); }
   #panel .panel-hd .tabs { flex: 1; margin-bottom: 0; }
-  #panel-close { flex: none; width: 44px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--field-border); background: rgba(130,130,140,0.18); color: var(--fg); font-size: 1.4rem; line-height: 1; cursor: pointer; }
-  #panel-close:hover { background: rgba(130,130,140,0.32); }
+  #panel-close { flex: none; width: 32px; display: grid; place-items: center; border-radius: 8px; border: none; background: none; color: var(--muted, rgba(244,246,251,0.6)); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+  #panel-close:hover { color: var(--fg); background: rgba(130,130,140,0.18); }
   #panel h2 { margin: 0 0 1rem; font-size: 1.05rem; font-weight: 500; }
   .tabs { display: flex; gap: 0.3rem; margin-bottom: 1.2rem; background: rgba(255,255,255,0.06); padding: 0.25rem; border-radius: 10px; }
   .tab { flex: 1; background: none; border: none; color: var(--muted); font: inherit; font-size: 0.88rem; padding: 0.45rem; border-radius: 7px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
@@ -276,6 +309,7 @@
   .sync-chip { display: flex; align-items: center; gap: 0.45rem; background: rgba(91,155,255,0.14); border: 1px solid rgba(91,155,255,0.4); border-radius: 8px; padding: 0.4rem 0.6rem; font-size: 0.85rem; }
   .sync-chip code { background: none; padding: 0; font-size: 0.92em; letter-spacing: 0.02em; }
   .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #7de0a0; flex: none; box-shadow: 0 0 6px rgba(125,224,160,0.7); }
+  .sync-fp { flex: none; font-size: 1rem; letter-spacing: 0.12em; cursor: default; }
   .modal-card .row { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin: 0.55rem 0; font-size: 0.9rem; }
   .modal-card .row.col { flex-direction: column; align-items: stretch; gap: 0.35rem; }
   .modal-card select, .modal-card input[type="text"] { background: rgba(255,255,255,0.08); border: 1px solid var(--field-border); border-radius: 8px; color: var(--fg); font: inherit; font-size: 0.88rem; padding: 0.4rem 0.5rem; }
@@ -341,13 +375,15 @@
   @keyframes ppspin { to { transform: rotate(360deg); } }
 
   /* suggestions dropdown */
-  .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 6; background: rgba(20,24,32,0.94); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
+  .suggest { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 6; background: rgba(20,24,32,0.94); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; overflow-y: auto; overflow-x: hidden; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
   .suggest[hidden] { display: none; }
   .sug-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.95rem; font-size: 0.98rem; color: var(--fg); cursor: pointer; }
   .sug-row:hover, .sug-row.active { background: rgba(255,255,255,0.12); }
   .sug-ic { flex: none; width: 16px; height: 16px; display: grid; place-items: center; opacity: 0.45; }
   .sug-ic svg { width: 16px; height: 16px; }
+  .sug-txwrap { display: flex; flex-direction: column; overflow: hidden; min-width: 0; flex: 1; }
   .sug-tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sug-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.78rem; color: var(--muted); opacity: 0.85; }
   .sub-note { color: var(--muted); font-size: 0.78em; }
 
   /* help / info modal */
@@ -372,16 +408,23 @@
   <div id="tint"></div>
 
   <div class="content">
-    <div class="clock" id="clock">--:--</div>
-    <svg id="analog" viewBox="0 0 100 100" hidden aria-hidden="true">
-      <g id="ticks"></g>
-      <line id="h-hour" x1="50" y1="50" x2="50" y2="28"></line>
-      <line id="h-min" x1="50" y1="50" x2="50" y2="17"></line>
-      <line id="h-sec" x1="50" y1="55" x2="50" y2="14"></line>
-      <circle class="pin" cx="50" cy="50" r="1.9"></circle>
-    </svg>
-    <div class="greeting" id="greeting"></div>
-    <div id="weather" hidden></div>
+    <div class="above-box" id="above-box">
+      <div class="brandmark" aria-hidden="true">
+        <svg viewBox="0 0 800 800">
+          <path d="M-0,800l0,-800l800,0l0,800l-800,-0Zm715.789,-715.789l-631.579,0l0,631.579l631.579,0l0,-631.579Zm-589.474,589.474l0,-252.632l84.211,0l84.211,126.316l-0,-126.028l84.211,0l0,252.344l-84.211,0l-84.211,-126.172l0,126.172l-84.211,-0Zm0,-505.263l42.105,-41.818l168.421,0l42.105,41.818l0,168.421l-42.105,42.105l-168.421,0l-42.105,-42.105l0,-168.421Zm84.211,42.105l0,84.211l84.211,0l0,-84.211l-84.211,0Zm210.526,168.421l0,-252.344l84.211,-0.287l42.105,84.211l42.105,-83.923l84.211,0l0,252.344l-84.211,0l0,-126.316l-42.105,84.211l-42.105,-84.067l0,126.172l-84.211,0Zm0,42.105l252.632,0l0,84.211l-84.211,0l0,84.211l84.211,0l0,84.211l-252.632,0l-0,-84.211l84.211,0l0,-84.211l-84.211,0l0,-84.211Z"/>
+        </svg>
+      </div>
+      <div class="clock" id="clock">--:--</div>
+      <svg id="analog" viewBox="0 0 100 100" hidden aria-hidden="true">
+        <g id="ticks"></g>
+        <line id="h-hour" x1="50" y1="50" x2="50" y2="28"></line>
+        <line id="h-min" x1="50" y1="50" x2="50" y2="17"></line>
+        <line id="h-sec" x1="50" y1="55" x2="50" y2="14"></line>
+        <circle class="pin" cx="50" cy="50" r="1.9"></circle>
+      </svg>
+      <div class="greeting" id="greeting"></div>
+      <div id="weather" hidden></div>
+    </div>
 
     <form id="form" autocomplete="off">
       <div class="field">
@@ -401,17 +444,19 @@
         <div id="suggest" class="suggest" hidden></div>
       </div>
       <div id="plugin-panel"><div class="pp-card"><div class="pp-spin"></div><div class="pp-content"></div></div></div>
+    </form>
+
+    <div class="below-box" id="below-box">
       <div class="hints" id="hints">
         <span class="hk"><kbd>⌥ ↵</kbd> search</span>
         <span class="hk"><kbd>⇧ ↵</kbd> go to site</span>
         <span class="hk"><kbd>⌘ ↵</kbd> ask Claude</span>
         <span class="hk"><kbd>⌘ /</kbd> help</span>
       </div>
-    </form>
-
-    <nav id="links" aria-label="Quick links" hidden></nav>
-    <nav id="frequent" aria-label="Frequent sites" hidden></nav>
-    <nav id="plugin-bar" aria-label="Plugins" hidden></nav>
+      <nav id="links" aria-label="Quick links" hidden></nav>
+      <nav id="frequent" aria-label="Frequent sites" hidden></nav>
+      <nav id="plugin-bar" aria-label="Plugins" hidden></nav>
+    </div>
   </div>
 
   <div id="credit"></div>
@@ -507,6 +552,8 @@
       <div class="row"><span>Focus box on load</span><input id="s-autofocus" type="checkbox" /></div>
       <div class="row"><span>Smart address detection</span><input id="s-smartUrl" type="checkbox" /></div>
       <div class="row"><span>Web suggestions <span class="sub-note">· sends typing to Google</span></span><input id="s-webSuggest" type="checkbox" /></div>
+      <div class="row"><span>Entity &amp; word suggestions <span class="sub-note">· sends typing to Wikidata + our dictionary</span></span><input id="s-entitySuggest" type="checkbox" /></div>
+      <div class="row"><span>Conversation suggestions <span class="sub-note">· sends typing to Bluesky</span></span><input id="s-conversationSuggest" type="checkbox" /></div>
       <div class="row"><span>Autocomplete visited sites</span><input id="s-siteHistory" type="checkbox" /></div>
       <div class="row"><span class="sub-note">Remembered locally, in this browser only</span><button class="minibtn" id="s-clearHistory" style="padding:0.25rem 0.5rem;font-size:0.78rem;">Clear</button></div>
       <div class="row"><span>Ask Claude opens</span><select id="s-claudeTarget"><option value="app">Desktop app</option><option value="web">claude.ai (web)</option></select></div>
@@ -528,7 +575,8 @@
         <button class="minibtn" id="sync-setup" style="width:100%;">Set up sync…</button>
       </div>
       <div id="sync-on" hidden>
-        <div class="sync-chip"><span class="sync-dot"></span><code id="sync-code"></code><button class="iconbtn sync-copy" id="sync-copy" title="Copy code" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <div class="sync-chip"><span class="sync-dot"></span><span id="sync-fp" class="sync-fp" title="Should show the same on every device using this code — a different set means it's not actually the same sync"></span><code id="sync-code"></code><button class="iconbtn sync-copy" id="sync-copy" title="Copy code" aria-label="Copy code"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button></div>
+        <p class="grp-note" style="margin-top:0.35rem;">The little icons are a fingerprint of your code — check they match on every device to confirm they're really on the same sync.</p>
         <div class="row" style="gap:0.4rem;margin-top:0.5rem;">
           <button class="minibtn" id="sync-now" style="flex:1;">Sync now</button>
           <button class="minibtn" id="sync-stop" style="flex:1;">Stop</button>
@@ -537,6 +585,7 @@
     </div>
 
     <button class="reset" id="s-reset">Reset to defaults</button>
+    <div id="build-stamp" title="When this build was last deployed">__BUILD_TIME__</div>
     </div>
 
     <div class="tabpane hidden" id="tab-links">
@@ -590,7 +639,7 @@
 const DEFAULTS = {
   name: "Lee",
   clockStyle: "digital", clock24h: true, showSeconds: false,
-  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, siteHistory: true, linksSize: "small", frequentSize: "small", freqMinVisits: 3, pluginsSize: "off", disabledPlugins: [],
+  showSearch: true, autofocus: false, smartUrl: true, webSuggest: false, entitySuggest: false, conversationSuggest: false, siteHistory: true, linksSize: "small", frequentSize: "small", freqMinVisits: 3, pluginsSize: "off", disabledPlugins: [],
   searchEngine: "ecosia",
   searchUrl: "https://www.ecosia.org/search?q={q}",
   claudeTarget: "app",
@@ -612,7 +661,7 @@ const DEFAULTS = {
     { keyword: "gmap", name: "Google Maps", url: "https://www.google.com/maps/search/{q}" },
   ],
 };
-const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx", hist: "startpage:domhist" };
+const K = { set: "startpage:settings", bg: "startpage:bg", next: "startpage:next", favs: "startpage:favs", list: "startpage:piclist", wx: "startpage:wx", hist: "startpage:domhist", histRemoved: "startpage:domhist-removed", tracked: "startpage:tracked", cvFavs: "startpage:cv-favs" };
 
 const readLS = (k) => { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } };
 const writeLS = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
@@ -743,7 +792,18 @@ function toUrl(s, aggressive) {
 }
 function goUrl(s, aggressive) { const u = toUrl(s, aggressive); if (!u) return; recordHistory(u); window.location.href = u; }
 
-/* ---- private, local autocomplete of sites visited via the box (never leaves the browser) ---- */
+/* ---- private, local autocomplete of sites visited via the box (never leaves the browser) ----
+   Synced across devices as its own additive resource (see the sync section below) —
+   a forget needs its own record (a "tombstone") alongside the entry list, or a
+   later merge from a device that never forgot it would just bring it straight
+   back. tombstone() is the one place that writes K.histRemoved. */
+function tombstone(keys) {
+  if (!keys.length) return;
+  const now = Date.now();
+  const map = new Map((readLS(K.histRemoved) || []).map((r) => [r.key, r]));
+  for (const k of keys) map.set(k, { key: k, removedAt: now });
+  writeLS(K.histRemoved, [...map.values()]);
+}
 function recordHistory(url) {
   if (!S.siteHistory) return;
   let u; try { u = new URL(url); } catch { return; }
@@ -758,6 +818,7 @@ function recordHistory(url) {
   h.unshift({ key, host, n: (ex ? ex.n : 0) + 1, t: Date.now() });
   if (h.length > 300) h = h.slice(0, 300);
   writeLS(K.hist, h);
+  syncHistOnChange();
 }
 function completionFor(typed) {
   const t = typed.toLowerCase().replace(/^www\./, "");
@@ -794,9 +855,12 @@ function forgetCurrent() {
   if (!(s < e && e === v.length && s > 0)) return false;     // only when a completion is showing
   const target = v.toLowerCase();
   let h = readLS(K.hist) || [];
-  if (v.indexOf("/") === -1) h = h.filter(x => (x.host || "").toLowerCase() !== target);  // bare domain → forget the whole site
-  else h = h.filter(x => (x.key || "").toLowerCase() !== target);                         // path → forget just that URL
+  const bareDomain = v.indexOf("/") === -1;
+  const gone = bareDomain ? h.filter(x => (x.host || "").toLowerCase() === target) : h.filter(x => (x.key || "").toLowerCase() === target);
+  h = bareDomain ? h.filter(x => (x.host || "").toLowerCase() !== target) : h.filter(x => (x.key || "").toLowerCase() !== target);
   writeLS(K.hist, h);
+  tombstone(gone.map((x) => x.key));   // so a merge from a device that hasn't forgotten it doesn't just bring it back
+  syncHistOnChange();
   input.value = v.slice(0, s);   // restore what you typed, then offer the next match
   tryComplete();
   return true;
@@ -854,6 +918,17 @@ input.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); if (!$("help").hidden) closeHelp(); else closePlugin(); return; }
     if (e.key === "Backspace" && input.value === "") { e.preventDefault(); closePlugin(); return; }
     if (e.key === "Enter") { e.preventDefault(); if (activePlugin.mod && activePlugin.mod.onEnter) activePlugin.mod.onEnter(input.value); return; }
+    if ((e.key === "ArrowDown" || e.key === "ArrowUp") && activePlugin.mod && activePlugin.mod.onArrow) {
+      e.preventDefault(); activePlugin.mod.onArrow(e.key === "ArrowDown" ? 1 : -1); return;
+    }
+    // onBack/onForward return false when there's nothing to do (e.g. still typing a query) —
+    // in that case fall through and let ←/→ move the text cursor as normal.
+    if (e.key === "ArrowLeft" && activePlugin.mod && activePlugin.mod.onBack) {
+      if (activePlugin.mod.onBack()) { e.preventDefault(); return; }
+    }
+    if (e.key === "ArrowRight" && activePlugin.mod && activePlugin.mod.onForward) {
+      if (activePlugin.mod.onForward()) { e.preventDefault(); return; }
+    }
     return;   // everything else types into the plugin's input as normal
   }
   if (sug.open) {
@@ -923,13 +998,47 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); input.focus(); }   // esc returns to the box (before the global Esc)
 }, true);
 
-/* ---- suggestions dropdown: your visited sites + (opt-in) Google web suggestions ---- */
+/* ---- suggestions dropdown: your visited sites + (opt-in) Google/entity/word suggestions ----
+   Local matches render instantly; every remote source (web suggest, entity search, word
+   lookup) resolves independently and re-renders as it lands, rather than waiting on all
+   three — same instant-then-progressive shape as the site-history/web-suggest split
+   already had. Hand-authored line icons (not iconify img fetches) keep this core,
+   always-loaded path free of any icon network dependency. */
 const suggestEl = $("suggest");
 const SUGGEST_MIN = 3;   // don't surface the dropdown until a few chars are typed (tweak to taste)
 const ICON_GLOBE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.7 2.6 15.3 0 18M12 3c-2.6 2.7-2.6 15.3 0 18"/></svg>`;
 const ICON_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
+const ICON_FILM = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M17 9h4M3 15h4M17 15h4"/></svg>`;
+const ICON_TV = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 21h8M12 19v2"/></svg>`;
+const ICON_BOOK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5a1.5 1.5 0 0 0 1.5-1.5z"/></svg>`;
+const ICON_PERSON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.3"/><path d="M5 20c1.2-4 4-6 7-6s5.8 2 7 6"/></svg>`;
+const ICON_GAME = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="8" width="19" height="10" rx="4"/><path d="M7 11v4M5 13h4M16 12h.01M18.5 14h.01"/></svg>`;
+const ICON_MUSIC = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>`;
+const ICON_WORD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg>`;
+const ICON_CONVO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+const ENTITY_ICON = { film: ICON_FILM, tv: ICON_TV, book: ICON_BOOK, person: ICON_PERSON, game: ICON_GAME, music: ICON_MUSIC };
 let sug = { items: [], idx: -1, open: false };
 let sugTimer = null, sugSeq = 0, sugScript = null;
+let entitySearchMod = null;
+function loadEntitySearch() {   // dynamically imported on first real use, never bundled into the always-loaded page — same lazy pattern as the trigger plugins
+  if (!entitySearchMod) entitySearchMod = import(`./plugins/entity-search.js?v=${APP_VERSION}`);
+  return entitySearchMod;
+}
+// shared rich Wikipedia reader (dict.js, culture.js) — loaded via api.createWikiViewer()
+// only by plugins that actually use it, same versioned/cached-once pattern as entity-search.
+let wikiViewerMod = null;
+function loadWikiViewer() {
+  if (!wikiViewerMod) wikiViewerMod = import(`./plugins/wiki-viewer.js?v=${APP_VERSION}`);
+  return wikiViewerMod;
+}
+// "what's popular right now" ranking signal (entity-search.js's dropdown, culture.js's
+// own search) — same versioned/cached-once loading, see trending.js for why this can't
+// just be a plain relative import from either of those files.
+let trendingMod = null, trendingModReady = null;   // ready = the resolved module, once loadTrending() settles — lets api.trendingRank() stay synchronous
+function loadTrending() {
+  if (!trendingMod) trendingMod = import(`./plugins/trending.js?v=${APP_VERSION}`).then((m) => (trendingModReady = m));
+  return trendingMod;
+}
 
 function typedPrefix() {   // what you actually typed, ignoring any selected inline-completion suffix
   const sel = input.selectionStart < input.selectionEnd && input.selectionEnd === input.value.length;
@@ -948,28 +1057,54 @@ function histMatches(prefix, limit) {
   return out.slice(0, limit || 6);
 }
 function closeSuggest() { suggestEl.hidden = true; suggestEl.innerHTML = ""; sug.open = false; sug.idx = -1; sug.items = []; }
+const SUG_ICON = { site: ICON_GLOBE, word: ICON_WORD, conversation: ICON_CONVO };
+function updateSuggestMaxHeight() {   // clamp to the viewport so a long list scrolls internally instead of running off the bottom with no way to reach it
+  const r = input.getBoundingClientRect();
+  const avail = window.innerHeight - r.bottom - 12;
+  suggestEl.style.maxHeight = Math.max(120, avail) + "px";
+}
+window.addEventListener("resize", () => { if (sug.open) updateSuggestMaxHeight(); });
 function renderSuggest(items) {
   items = (items || []).slice(0, 8);
-  sug.items = items; sug.idx = -1; suggestEl.innerHTML = "";
+  // re-renders happen progressively as each remote source resolves (see maybeSuggest) — keep
+  // whatever the user had arrow-key-selected pointed at the same item, not reset to nothing,
+  // as long as that item is still present in the new list.
+  const prevKey = sug.idx >= 0 && sug.items[sug.idx] ? sug.items[sug.idx].type + "|" + sug.items[sug.idx].text : null;
+  sug.items = items; suggestEl.innerHTML = "";
   if (!items.length) { closeSuggest(); return; }
   items.forEach((it) => {
     const row = document.createElement("div"); row.className = "sug-row";
-    const ic = document.createElement("span"); ic.className = "sug-ic"; ic.innerHTML = it.type === "site" ? ICON_GLOBE : ICON_SEARCH;
-    const tx = document.createElement("span"); tx.className = "sug-tx"; tx.textContent = it.text;
-    row.append(ic, tx);
+    const ic = document.createElement("span"); ic.className = "sug-ic";
+    ic.innerHTML = SUG_ICON[it.type] || (it.type === "entity" ? ENTITY_ICON[it.cat] : null) || ICON_SEARCH;
+    const txWrap = document.createElement("span"); txWrap.className = "sug-txwrap";
+    const tx = document.createElement("span"); tx.className = "sug-tx"; tx.textContent = it.label || it.text;
+    txWrap.appendChild(tx);
+    if (it.desc) { const d = document.createElement("span"); d.className = "sug-desc"; d.textContent = it.desc; txWrap.appendChild(d); }
+    row.append(ic, txWrap);
     row.onmousedown = (e) => { e.preventDefault(); chooseSuggest(it); };
     suggestEl.appendChild(row);
   });
+  updateSuggestMaxHeight();
   suggestEl.hidden = false; sug.open = true;
+  sug.idx = prevKey ? items.findIndex((it) => it.type + "|" + it.text === prevKey) : -1;
+  [...suggestEl.children].forEach((r, i) => r.classList.toggle("active", i === sug.idx));
 }
 function highlight(n) {
   const rows = [...suggestEl.children];
   if (!rows.length) return;
   sug.idx = (n + rows.length) % rows.length;
   rows.forEach((r, i) => r.classList.toggle("active", i === sug.idx));
+  rows[sug.idx].scrollIntoView({ block: "nearest" });   // the dropdown scrolls now (see updateSuggestMaxHeight) — keep the highlighted row in view as ↑↓ moves past the visible edge
   input.value = sug.items[sug.idx].text;
 }
-function chooseSuggest(it) { closeSuggest(); input.value = it.text; it.type === "site" ? goUrl(it.text, false) : goSearch(); }
+function chooseSuggest(it) {
+  closeSuggest();
+  if (it.type === "site") { input.value = it.text; goUrl(it.text, false); return; }
+  if (it.type === "entity") { openPlugin(PLUGINS.find((p) => p.id === "culture"), it.text, { id: it.id, label: it.text }); return; }
+  if (it.type === "word") { openPlugin(PLUGINS.find((p) => p.id === "dict"), it.text); return; }
+  if (it.type === "conversation") { openPlugin(PLUGINS.find((p) => p.id === "conversations"), it.text); return; }
+  input.value = it.text; goSearch();
+}
 function fetchSuggest(q, cb) {
   const id = "__sug" + (++sugSeq);
   const cleanup = () => { try { delete window[id]; } catch {} if (sugScript) { sugScript.remove(); sugScript = null; } };
@@ -980,24 +1115,79 @@ function fetchSuggest(q, cb) {
   sugScript.src = `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(q)}&jsonp=${id}`;
   document.head.appendChild(sugScript);
 }
+/* Lightweight "people are talking about this" peek for the Conversations
+   plugin (Bluesky) — a plain keyless fetch against api.bsky.app (confirmed
+   CORS-enabled, same endpoint the plugin itself uses), kept here rather than
+   in plugins/conversations.js so a suggestion peek doesn't have to load the
+   whole plugin module just to check for volume. */
+function fetchConversationTeaser(q, cb) {
+  fetch(`https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(q)}&limit=3&sort=top`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => cb((data && data.posts) || []))
+    .catch(() => cb([]));
+}
 function maybeSuggest() {
   clearTimeout(sugTimer);
   const q = typedPrefix();
   if (activeBang || activePlugin || q.length < SUGGEST_MIN || q.startsWith("/")) { closeSuggest(); return; }
-  const siteItems = (S.siteHistory && !/\s/.test(q)) ? histMatches(q, 5).map(t => ({ type: "site", text: t })) : [];
-  renderSuggest(siteItems);   // local matches show instantly
-  if (S.webSuggest && !(S.smartUrl && looksLikeUrl(q))) {
-    sugTimer = setTimeout(() => fetchSuggest(q, web => {
-      if (typedPrefix() !== q) return;   // stale — you've typed more
-      renderSuggest(siteItems.concat(web.slice(0, 6).map(s => ({ type: "search", text: s }))));
-    }), 140);
-  }
+  const isUrlish = S.smartUrl && looksLikeUrl(q);
+  // zero-cost, no network — always available regardless of the opt-in suggestion settings below.
+  const literalItem = isUrlish ? [] : [{ type: "literal", label: `Search the web for "${q}"`, text: q }];
+  const siteItems = (S.siteHistory && !/\s/.test(q)) ? histMatches(q, 5).map((t) => ({ type: "site", text: t })) : [];
+  let webItems = [], entityItems = [], wordItems = [], conversationItems = [];
+  // conversationItems sits ahead of entityItems (which can fill up to 6 slots on its own) so the
+  // teaser has a guaranteed shot at a visible slot instead of routinely being sliced off the end.
+  const rerender = () => renderSuggest([...literalItem, ...siteItems, ...wordItems, ...conversationItems, ...entityItems, ...webItems]);
+  rerender();   // local + literal show instantly; each remote source below fills in independently as it resolves
+  const wantWeb = S.webSuggest && !isUrlish;
+  const wantEntity = S.entitySuggest && !isUrlish;
+  const wantConversation = S.conversationSuggest && !isUrlish;
+  if (!wantWeb && !wantEntity && !wantConversation) return;
+  sugTimer = setTimeout(() => {
+    if (wantWeb) {
+      fetchSuggest(q, (web) => {
+        if (typedPrefix() !== q) return;   // stale — you've typed more
+        webItems = web.slice(0, 6).map((s) => ({ type: "search", text: s }));
+        rerender();
+      });
+    }
+    if (wantEntity) {
+      Promise.all([loadEntitySearch(), loadTrending()]).then(([mod, tmod]) => {
+        if (typedPrefix() !== q) return;
+        tmod.ensureTrending().then(() => {
+          if (typedPrefix() !== q) return;
+          mod.searchEntities(q, 6, tmod.trendingRank).then((ents) => {
+            if (typedPrefix() !== q) return;
+            entityItems = ents.map((e) => ({ type: "entity", text: e.label, desc: e.desc, id: e.id, cat: e.cat }));
+            rerender();
+          }).catch(() => {});
+        });
+        if (!/\s/.test(q)) {
+          mod.searchWord(q).then((w) => {
+            if (typedPrefix() !== q) return;
+            wordItems = w ? [{ type: "word", text: q, desc: (w.pos ? w.pos + " · " : "") + w.gloss }] : [];
+            rerender();
+          }).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+    if (wantConversation) {
+      fetchConversationTeaser(q, (posts) => {
+        if (typedPrefix() !== q) return;
+        if (posts.length) {
+          const snippet = ((posts[0].record && posts[0].record.text) || "").replace(/\s+/g, " ").trim().slice(0, 80);
+          conversationItems = [{ type: "conversation", text: q, label: `People are talking about "${q}"`, desc: snippet }];
+        } else conversationItems = [];
+        rerender();
+      });
+    }
+  }, 140);
 }
 input.addEventListener("blur", () => setTimeout(closeSuggest, 150));
 
 /* Bump on every deploy that changes a plugin — appended to plugin import URLs
    so browsers fetch the new code instead of a hard-cached ES module. */
-const APP_VERSION = "2026.08.01b";
+const APP_VERSION = "2026.08.06d";
 
 /* True when opened inside the mac quick-launcher (it loads us with ?launcher=1).
    A hook for launcher-aware behaviour — currently: Esc closes the popup once
@@ -1009,18 +1199,45 @@ const IS_LAUNCHER = new URLSearchParams(location.search).has("launcher");
    The registry below holds what's needed BEFORE load (trigger, chip, height);
    the module itself ships in plugins/<name>.js and is fetched on first use.
    Module contract: export default { hints, mount(root, api), onInput(text),
-   onEnter(text), unmount() } — api: { setInput, getInput, setHeight, close,
-   setButtons, hasWallpaper, pickFromWallpaper }. A plugin adds its OWN omnibox
-   buttons via setButtons() on mount — the core stays plugin-agnostic. */
+   onEnter(text), onArrow(dir), onBack(), onForward(), onSeed(seed), unmount() } —
+   api: { setInput, getInput, setHeight, setDock, close, setButtons, hasWallpaper,
+   pickFromWallpaper }. A plugin adds its OWN omnibox buttons via setButtons() on
+   mount — the core stays plugin-agnostic.
+   api.setDock("always"|"auto"|"never"|null) overrides a plugin's own registry dock
+   policy at runtime — for content with a few known, fixed sizes (Arcade's different
+   game boards) rather than organically-variable content, where dock:"auto"'s
+   height-threshold guess is the wrong tool: pass null to fall back to the registry
+   value again.
+   onArrow(dir) is optional — implement it to support ↑/↓ moving a selection
+   through a result list (dir is +1 for ArrowDown, -1 for ArrowUp); the host only
+   forwards the key when the plugin declares it, so plugins without a navigable
+   list are unaffected.
+   onBack()/onForward() are optional too — implement them for ←/→ to step through a
+   plugin's own navigation history (e.g. drilling into a result, then another, then
+   back out). Each must return true if it handled the key or false to decline, in
+   which case the host lets ←/→ fall through to normal text-cursor movement — a
+   plugin only has real "history" once you've navigated somewhere, so this keeps
+   arrow keys editing the query text right up until there's something to go back to.
+   onSeed(seed) is optional — openPlugin(def, initial, seed) calls it instead of
+   onInput() when the caller already knows the exact target (e.g. the general
+   omnibox search hands over {id,label} for a specific Wikidata QID), so the
+   plugin can jump straight there instead of re-running a fresh text search. */
+// dock (optional, default "never"): panel-layout policy — see updatePanelLayout().
+//   "never"  — always home layout, height-capped as before (short, fixed-size utility plugins).
+//   "always" — home layout as a jarring flash before the dock happens serves no one; dock the
+//              instant it opens, whether or not it has content yet.
+//   "auto"   — starts home layout; the host promotes it to panel layout itself the first time
+//              its requested content height would've exceeded the home cap. One-way per session.
 const PLUGINS = [
   { id: "calc", trigger: "==", title: "Calculator", icon: "=", iconify: "lucide:calculator", height: 210, src: "./plugins/calc.js" },
   { id: "color", trigger: "##", title: "Colour", icon: "#", iconify: "lucide:palette", height: 96, src: "./plugins/color.js" },
   { id: "tools", trigger: "<>", title: "Tools", icon: ">", iconify: "lucide:wrench", height: 96, src: "./plugins/tools.js" },
-  { id: "dict", trigger: "??", title: "Dictionary", icon: "?", iconify: "lucide:book-open", height: 96, src: "./plugins/dict.js" },
+  { id: "dict", trigger: "??", title: "Dictionary", icon: "?", iconify: "lucide:book-open", height: 96, src: "./plugins/dict.js", dock: "auto" },
   { id: "img", trigger: "[]", title: "Images", icon: "▦", iconify: "lucide:image", height: 120, src: "./plugins/img.js" },
   { id: "map", trigger: "@@", title: "Map", icon: "@", iconify: "lucide:map-pin", height: 120, src: "./plugins/map.js" },
   { id: "arcade", trigger: "::", title: "Arcade", icon: "🕹", iconify: "lucide:gamepad-2", height: 300, src: "./plugins/arcade.js" },
-  { id: "screen", trigger: "**", title: "Screen", icon: "★", iconify: "lucide:clapperboard", height: 120, src: "./plugins/screen.js" },
+  { id: "culture", trigger: "**", title: "Culture", icon: "★", iconify: "lucide:clapperboard", height: 120, src: "./plugins/culture.js", dock: "always" },
+  { id: "conversations", trigger: '""', title: "Conversations", icon: "”", iconify: "lucide:message-circle", height: 120, src: "./plugins/conversations.js", dock: "auto" },
 ];
 let activePlugin = null, pluginGen = 0, savedHintsHTML = null;
 const pluginPanel = $("plugin-panel");
@@ -1045,10 +1262,13 @@ function setPluginButtons(defs) {
     return b;
   });
 }
-async function openPlugin(def, initial) {
+async function openPlugin(def, initial, seed) {   // seed (optional): a specific already-identified target (e.g. {id,label} for a QID) —
+                                                    // routes to mod.onSeed() instead of a fresh mod.onInput() text search, so picking an
+                                                    // exact entity from the general omnibox search opens straight to it, not a re-search.
   if (activePlugin) return;
   const gen = ++pluginGen;
-  activePlugin = { def, mod: null, gen };
+  activePlugin = { def, mod: null, gen, autoDocked: false, dockOverride: null };
+  updatePanelLayout();
   closeSuggest();
   const chip = $("plugin-chip");
   chip.innerHTML = "";
@@ -1061,7 +1281,7 @@ async function openPlugin(def, initial) {
   if (savedHintsHTML == null) savedHintsHTML = $("hints").innerHTML;
   setPluginHints([["", "loading…"]]);
   pluginPanel.classList.add("loading", "open");
-  pluginPanel.style.height = (def.height || 160) + "px";
+  pluginPanel.style.height = Math.min(def.height || 160, currentHeightCeiling()) + "px";
   try {
     const mod = (await import(def.src + "?v=" + APP_VERSION)).default;
     if (!activePlugin || activePlugin.gen !== gen) return;   // closed while loading
@@ -1069,18 +1289,42 @@ async function openPlugin(def, initial) {
     const api = {
       setInput: (v) => { input.value = v; updateClear(); },
       getInput: () => input.value,
-      setHeight: (px) => { pluginPanel.style.height = px + "px"; },
+      setHeight: (px) => {
+        if (!activePlugin || activePlugin.gen !== gen) return;   // stale — a later plugin is active now
+        activePlugin.lastPx = px;                                 // remembered so a window resize can re-clamp against the new ceiling, not just the old one
+        const dock = activePlugin.dockOverride || def.dock;
+        if (dock === "auto" && !activePlugin.autoDocked && px > HOME_MAXH()) {
+          activePlugin.autoDocked = true;   // one-way per session — see updatePanelLayout()
+          updatePanelLayout();
+        }
+        pluginPanel.style.height = Math.min(px, currentHeightCeiling()) + "px";
+      },
+      // lets a plugin override its own static registry dock policy at runtime — for content that
+      // comes in a few known, fixed sizes (e.g. Arcade's different game boards) rather than
+      // organically-variable content, where dock:"auto"'s height-threshold guess is the wrong
+      // tool. Pass "always"/"auto"/"never", or null to fall back to the registry's own dock value.
+      setDock: (mode) => { if (activePlugin && activePlugin.gen === gen) { activePlugin.dockOverride = mode; updatePanelLayout(); } },
       close: closePlugin,
       setButtons: setPluginButtons,                                       // own buttons on the omnibox right edge
       hasWallpaper: () => !!lastImg,                                       // is there an image to sample?
       pickFromWallpaper: (cb) => { if (picking) { endPick(); return; } if (lastImg) beginPick((raw) => cb({ raw, shown: shownColour(raw) }), null); },
+      // opt-in, lazy-loaded shared rich Wikipedia reader — only fetched the first time
+      // a plugin actually calls this, never for plugins that don't need it.
+      createWikiViewer: async (onUpdate) => (await loadWikiViewer()).createWikiViewer(onUpdate),
+      // "what's popular right now" ranking signal — see trending.js. ensureTrending()
+      // must resolve before trendingRank() returns anything useful; trendingRank()
+      // itself is synchronous (reads an in-memory cache) so it can sit inside a plain
+      // Array.sort() comparator.
+      ensureTrending: async () => (await loadTrending()).ensureTrending(),
+      trendingRank: (label, desc) => (trendingModReady ? trendingModReady.trendingRank(label, desc) : null),
     };
     pluginContent.innerHTML = "";
     mod.mount(pluginContent, api);
     pluginPanel.classList.remove("loading");
     pluginContent.classList.add("show");
     setPluginHints((mod.hints || []).concat(mod.help ? [["⌘/", "help"]] : []));
-    if (mod.onInput) mod.onInput(input.value);
+    if (seed && mod.onSeed) mod.onSeed(seed);
+    else if (mod.onInput) mod.onInput(input.value);
   } catch (err) {
     if (!activePlugin || activePlugin.gen !== gen) return;
     pluginPanel.classList.remove("loading");
@@ -1094,6 +1338,7 @@ function closePlugin() {
   if (picking) endPick();
   try { if (activePlugin.mod && activePlugin.mod.unmount) activePlugin.mod.unmount(); } catch {}
   activePlugin = null; pluginGen++;
+  updatePanelLayout();
   $("plugin-btns").innerHTML = "";                     // drop the plugin's omnibox buttons
   pluginContent.classList.remove("show");
   pluginPanel.classList.remove("loading", "open");
@@ -1654,10 +1899,16 @@ function bookmarkletHref() {                                       // runs on th
 
 /* ============ cloud sync — end-to-end encrypted, optional (Cloudflare Worker backend) ============
    The server only ever stores ciphertext under a hash-derived id; your sync code is the key and
-   never leaves the device. Last-write-wins with a revision check (not a field merge). */
+   never leaves the device. Two independent resources share one code but get their own id + rev:
+     - the "profile" blob (settings/favourites/watchlist/conversations-favourites) — small, changes
+       rarely, plain last-write-wins with a revision check (not a field merge), same as always.
+     - browsing history — large, changes constantly, and unlike the profile fields it's naturally
+       ADDITIVE (two devices browsing in parallel should union, not clobber). Giving it its own
+       resource means an unrelated settings push on one device can never again silently wipe
+       history from the shared copy the way a single whole-document blob could. See mergeHist(). */
 // Default endpoint. Currently the workers.dev URL so browser + launcher work without a console
 // override; switch to your custom subdomain (e.g. https://api.<brand>.uk/api) once it's routed.
-const SYNC_API = localStorage.getItem("startpage:syncApi") || "https://startpage-sync.leecorbin.workers.dev/api";
+const SYNC_API = localStorage.getItem("startpage:syncApi") || "https://api.omnibox.uk/api";
 const K_SYNC = "startpage:sync";                                     // device-local config — never itself synced
 
 const b64u = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -1665,7 +1916,8 @@ function unb64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.lengt
 const utf8 = (s) => new TextEncoder().encode(s);
 async function sha256(str) { return new Uint8Array(await crypto.subtle.digest("SHA-256", utf8(str))); }
 const normCode = (c) => (c || "").trim().toLowerCase().replace(/[\s-]+/g, "");    // format/case/space-insensitive, so a pasted code always matches
-async function syncId(code) { return b64u(await sha256("id|" + normCode(code))).slice(0, 43); }   // lookup id — reveals nothing about the code
+async function syncId(code) { return b64u(await sha256("id|" + normCode(code))).slice(0, 43); }   // profile blob's lookup id — reveals nothing about the code
+async function syncHistId(code) { return b64u(await sha256("hid|" + normCode(code))).slice(0, 43); }   // history's own, separate id — same code, different KV row
 async function syncKey(code) {
   const c = normCode(code);
   const base = await crypto.subtle.importKey("raw", utf8(c), "PBKDF2", false, ["deriveKey"]);
@@ -1688,6 +1940,15 @@ function syncGenCode() {                                             // strong d
 }
 // cosmetic: hyphenate a code-style string in 4s (leaves a spaced passphrase alone)
 function formatCode(v) { if (/\s/.test(v)) return v; const s = v.replace(/-/g, ""); return (/^[a-z0-9]+$/i.test(s) && s.length <= 24) ? s.replace(/(.{4})(?=.)/g, "$1-") : v; }
+// A short, human-glanceable fingerprint of a sync code — NOT a security check (no need
+// for one; the code itself already is), just a way to catch "these two devices think
+// they're on the same sync but actually aren't" at a glance, without pasting codes to
+// compare character-by-character. Same code → same three icons, always.
+const FINGERPRINT_EMOJI = ["🍎","🍊","🍋","🍇","🍓","🍒","🍑","🥝","🍉","🍍","🥑","🌽","🍄","🌵","🌲","🌻","🌷","🌈","⭐","🔥","💧","❄️","⚡","🌙","☀️","🪐","🎈","🎲","🎯","🎨","🎸","🚀","⛵","🚲","🏰","🗿","🔑","💎","🦋","🐢","🦉","🐳","🦄","🐸","🐙","🦊","🐨","🐧"];
+async function syncFingerprint(code) {
+  const h = await sha256("fp|" + normCode(code));
+  return [h[0], h[1], h[2]].map((b) => FINGERPRINT_EMOJI[b % FINGERPRINT_EMOJI.length]).join("");
+}
 // a small transient toast, plus a robust clipboard copy (with a fallback)
 function toast(msg, ms) { let t = document.getElementById("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; document.body.appendChild(t); } t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove("show"), ms || 2600); }
 async function copyText(t) { try { await navigator.clipboard.writeText(t); return true; } catch { try { const a = document.createElement("textarea"); a.value = t; a.style.cssText = "position:fixed;opacity:0"; document.body.appendChild(a); a.select(); document.execCommand("copy"); a.remove(); return true; } catch { return false; } } }
@@ -1697,15 +1958,14 @@ const SVG_COPY = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const syncCfg = () => readLS(K_SYNC);
 const syncSaveCfg = (c) => writeLS(K_SYNC, c);
 const syncClearCfg = () => { try { localStorage.removeItem(K_SYNC); } catch {} };
-function syncBuildBlob(scope) {                                      // excludes image-rotation state and the sync config itself
-  const blob = { v: 1, set: readLS(K.set) || {}, favs: readLS(K.favs) || [] };
-  if (scope === "all") blob.hist = readLS(K.hist) || [];
-  return blob;
+function syncBuildBlob() {                                          // excludes image-rotation state, history (its own resource below) and the sync config itself
+  return { v: 1, set: readLS(K.set) || {}, favs: readLS(K.favs) || [], tracked: readLS(K.tracked) || [], cvFavs: readLS(K.cvFavs) || null };
 }
 function syncApplyBlob(blob) {
   if (blob.set) writeLS(K.set, blob.set);
   if (blob.favs) writeLS(K.favs, blob.favs);
-  if (blob.hist) writeLS(K.hist, blob.hist);
+  if (blob.tracked) writeLS(K.tracked, blob.tracked);
+  if (blob.cvFavs) writeLS(K.cvFavs, blob.cvFavs);
 }
 async function syncGET(path) { const r = await fetch(SYNC_API + path); if (r.status === 404) return { gone: true }; if (!r.ok) throw new Error("sync " + r.status); return r.json(); }
 const syncPOST = (body) => fetch(SYNC_API + "/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -1716,12 +1976,12 @@ async function syncPush(firstTime) {
   syncBusy = true;
   try {
     const id = await syncId(c.code), key = await syncKey(c.code);
-    let res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c.scope)), baseRev: c.rev || 0, ttl: c.ttl || 0 });
+    let res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob()), baseRev: c.rev || 0, ttl: c.ttl || 0 });
     if (res.status === 409) {
       if (firstTime) { syncClearCfg(); syncRenderGroup(); alert("That code is already in use. Use “Connect” below to join it, or generate a different code."); return; }
       const cur = await syncGET("/sync/" + id + "/rev");            // stale → take the server's rev and re-push (your latest change wins)
       if (cur.gone) return syncStopped("removed");
-      res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob(c.scope)), baseRev: cur.rev, ttl: c.ttl || 0 });
+      res = await syncPOST({ id, ciphertext: await syncEnc(key, syncBuildBlob()), baseRev: cur.rev, ttl: c.ttl || 0 });
     }
     if (!res.ok) throw new Error("push " + res.status);
     syncSaveCfg({ ...syncCfg(), rev: (await res.json()).rev });
@@ -1736,7 +1996,7 @@ async function syncPull() {
   if (data.gone) { syncStopped("removed"); return false; }
   let blob; try { blob = await syncDec(await syncKey(c.code), data.ciphertext); } catch { toast("Couldn't read that sync — wrong code?"); return false; }
   syncApplyBlob(blob);
-  syncSaveCfg({ ...c, rev: data.rev, scope: blob.hist ? "all" : c.scope });
+  syncSaveCfg({ ...c, rev: data.rev });
   return true;
 }
 async function syncRevCheck() {                                     // on load / focus: pull only if the server is newer
@@ -1747,7 +2007,88 @@ async function syncRevCheck() {                                     // on load /
     if ((r.rev || 0) > (c.rev || 0) && await syncPull()) { sessionStorage.setItem("startpage:toast", "Updated from another device ✓"); location.reload(); }
   } catch {}
 }
-async function syncDeleteRemote() { const c = syncCfg(); if (!c) return; try { await fetch(SYNC_API + "/sync/" + (await syncId(c.code)), { method: "DELETE" }); } catch {} }
+
+/* ---- history: its own resource, merged rather than overwritten ----
+   Entries are additive (union by key, newest wins on n/t); a forget is a tombstone
+   that only suppresses an entry while it's newer than the entry itself — a genuine
+   revisit elsewhere after the forget is treated as "still wanted" and un-forgets it,
+   so you're never stuck re-forgetting the same thing on one device forever. */
+function mergeHist(localEntries, localRemoved, remoteEntries, remoteRemoved) {
+  const removedMap = new Map();
+  for (const r of [...(localRemoved || []), ...(remoteRemoved || [])]) {
+    const ex = removedMap.get(r.key);
+    if (!ex || r.removedAt > ex.removedAt) removedMap.set(r.key, r);
+  }
+  const cutoff = Date.now() - 90 * 864e5;   // tombstones don't need to live forever — every device's own 300-entry cap means anything this old has already aged out everywhere
+  for (const [k, r] of removedMap) if (r.removedAt < cutoff) removedMap.delete(k);
+
+  const entryMap = new Map();
+  for (const e of [...(localEntries || []), ...(remoteEntries || [])]) {
+    const ex = entryMap.get(e.key);
+    entryMap.set(e.key, ex ? { key: e.key, host: e.host || ex.host, n: Math.max(e.n || 0, ex.n || 0), t: Math.max(e.t || 0, ex.t || 0) } : { ...e });
+  }
+  for (const [k, tomb] of removedMap) {
+    const e = entryMap.get(k);
+    if (e && e.t <= tomb.removedAt) entryMap.delete(k);
+  }
+  return { entries: [...entryMap.values()].sort((a, b) => b.t - a.t).slice(0, 300), removed: [...removedMap.values()] };
+}
+function syncHistApply(merged) { writeLS(K.hist, merged.entries); writeLS(K.histRemoved, merged.removed); }
+async function syncGetHistRemote(id, key) {
+  const data = await syncGET("/sync/" + id);
+  if (data.gone) return { remote: { entries: [], removed: [] }, rev: 0 };
+  let remote = { entries: [], removed: [] };
+  try { remote = await syncDec(key, data.ciphertext); } catch {}
+  return { remote, rev: data.rev };
+}
+let syncHistBusy = false;
+async function syncPushHist() {                                     // pull latest remote, merge in this device's own changes, push the union — never a blind overwrite
+  const c = syncCfg(); if (!c || syncHistBusy) return;
+  syncHistBusy = true;
+  try {
+    const id = await syncHistId(c.code), key = await syncKey(c.code);
+    let { remote, rev } = await syncGetHistRemote(id, key);
+    let merged = mergeHist(readLS(K.hist) || [], readLS(K.histRemoved) || [], remote.entries, remote.removed);
+    syncHistApply(merged);
+    let res = await syncPOST({ id, ciphertext: await syncEnc(key, { v: 1, ...merged }), baseRev: rev, ttl: c.ttl || 0 });
+    if (res.status === 409) {                                       // someone else pushed meanwhile — merge is commutative, so merging again and retrying is always safe
+      ({ remote, rev } = await syncGetHistRemote(id, key));
+      merged = mergeHist(merged.entries, merged.removed, remote.entries, remote.removed);
+      syncHistApply(merged);
+      res = await syncPOST({ id, ciphertext: await syncEnc(key, { v: 1, ...merged }), baseRev: rev, ttl: c.ttl || 0 });
+    }
+    if (res.ok) syncSaveCfg({ ...syncCfg(), histRev: (await res.json()).rev });
+  } catch {}
+  finally { syncHistBusy = false; }
+}
+async function syncPullHist(pushBack) {                              // pull + merge locally; pushBack also contributes this device's own history up in the same action (used on reconnect)
+  const c = syncCfg(); if (!c) return;
+  try {
+    const id = await syncHistId(c.code), key = await syncKey(c.code);
+    const { remote, rev } = await syncGetHistRemote(id, key);
+    const merged = mergeHist(readLS(K.hist) || [], readLS(K.histRemoved) || [], remote.entries, remote.removed);
+    syncHistApply(merged);
+    syncSaveCfg({ ...syncCfg(), histRev: rev });
+    if (pushBack) await syncPushHist();
+  } catch {}
+}
+async function syncHistRevCheck() {                                 // on load / focus — quiet pull+merge, no reload needed: the next keystroke just sees the merged history
+  const c = syncCfg(); if (!c) return;
+  try {
+    const r = await syncGET("/sync/" + (await syncHistId(c.code)) + "/rev");
+    if (!r.gone && (r.rev || 0) > (c.histRev || 0)) await syncPullHist(false);
+  } catch {}
+}
+let syncHistPushTimer = null;
+function syncHistOnChange() { if (!syncCfg()) return; clearTimeout(syncHistPushTimer); syncHistPushTimer = setTimeout(syncPushHist, 2000); }   // a visit (or a forget) → push just the history resource, debounced
+
+async function syncDeleteRemote() {
+  const c = syncCfg(); if (!c) return;
+  try {
+    await fetch(SYNC_API + "/sync/" + (await syncId(c.code)), { method: "DELETE" });
+    await fetch(SYNC_API + "/sync/" + (await syncHistId(c.code)), { method: "DELETE" });
+  } catch {}
+}
 function syncStopped(reason) {
   syncClearCfg(); syncRenderGroup();
   if (reason === "removed") toast("This sync was removed elsewhere — your settings are unchanged. Set up a new one to start again.", 5000);
@@ -1755,13 +2096,17 @@ function syncStopped(reason) {
 let syncPushTimer = null;
 function syncOnChange() { if (!syncCfg()) return; clearTimeout(syncPushTimer); syncPushTimer = setTimeout(() => syncPush(), 1500); }
 let syncFocusTimer = null;
-function syncFocusCheck() { if (!syncCfg()) return; clearTimeout(syncFocusTimer); syncFocusTimer = setTimeout(syncRevCheck, 500); }   // returning to the page → check for updates
+function syncFocusCheck() { if (!syncCfg()) return; clearTimeout(syncFocusTimer); syncFocusTimer = setTimeout(() => { syncRevCheck(); syncHistRevCheck(); }, 500); }   // returning to the page → check for updates
 function syncPendingToast() { const m = sessionStorage.getItem("startpage:toast"); if (m) { sessionStorage.removeItem("startpage:toast"); setTimeout(() => toast(m), 350); } }
 
 function syncRenderGroup() {
   const c = syncCfg(), off = $("sync-off"), on = $("sync-on"); if (!off || !on) return;
   off.hidden = !!c; on.hidden = !c;
-  if (c) $("sync-code").textContent = c.code;
+  if (c) {
+    $("sync-code").textContent = c.code;
+    const fp = $("sync-fp");
+    if (fp) { fp.textContent = ""; syncFingerprint(c.code).then((f) => { fp.textContent = f; }); }
+  }
 }
 
 function syncOpenSetup() {
@@ -1777,7 +2122,7 @@ function syncOpenSetup() {
          <button class="iconbtn" id="sy-gen" title="Generate a new code" aria-label="Generate">${SVG_DICE}</button>
          <button class="iconbtn" id="sy-copy" title="Copy code" aria-label="Copy">${SVG_COPY}</button></div>
        <div class="row"><span>Keep for</span><select id="sy-ttl"><option value="0">Until I remove it</option><option value="86400">24 hours</option><option value="3600">1 hour</option></select></div>
-       <div class="row"><span>Include</span><select id="sy-scope"><option value="settings">Settings</option><option value="all">Everything (incl. history)</option></select></div>
+       <p class="grp-note" style="margin:0.2rem 0 0.6rem;">Browsing history (autocomplete) syncs too — merged across devices, never wiped by another device's own push.</p>
        <button class="minibtn accent" id="sy-create" style="width:100%">Create sync ↑</button>
      </div>
      <div id="sy-connect-pane" hidden>
@@ -1803,14 +2148,18 @@ function syncOpenSetup() {
   $("sy-existing").addEventListener("input", (e) => { e.target.value = formatCode(e.target.value); });
   $("sy-create").onclick = async () => {
     if (normCode(code.value).length < 6) return alert("That code is too short.");
-    syncSaveCfg({ code: code.value.trim(), scope: $("sy-scope").value, ttl: Number($("sy-ttl").value), rev: 0 });
-    close(); syncRenderGroup(); await syncPush(true);
+    syncSaveCfg({ code: code.value.trim(), ttl: Number($("sy-ttl").value), rev: 0, histRev: 0 });
+    close(); syncRenderGroup();
+    await syncPush(true);
+    await syncPushHist();   // establishes the history resource too, seeded from whatever this device already has
   };
   $("sy-connect").onclick = async () => {
     const ex = $("sy-existing").value.trim();
     if (normCode(ex).length < 6) return alert("Enter the code from your other device.");
-    syncSaveCfg({ code: ex, scope: "settings", ttl: 0, rev: 0 });   // scope/ttl come from the blob on pull
-    const ok = await syncPull(); close();
+    syncSaveCfg({ code: ex, ttl: 0, rev: 0, histRev: 0 });
+    const ok = await syncPull();
+    if (ok) await syncPullHist(true);   // restore history too, and contribute this device's own back in the same step
+    close();
     if (ok) { sessionStorage.setItem("startpage:toast", "Settings synced from your code ✓"); location.reload(); }
     else syncClearCfg();
   };
@@ -1930,7 +2279,10 @@ function bindSeg(id, key, after) {                                 // wire an [O
 }
 function forgetHost(host) {
   const h = readLS(K.hist) || [];
+  const gone = h.filter(x => (x.host || "") === host);
   writeLS(K.hist, h.filter(x => (x.host || "") !== host));
+  tombstone(gone.map((x) => x.key));
+  syncHistOnChange();
 }
 function renderFrequent() {
   const nav = $("frequent"); if (!nav) return; nav.innerHTML = "";
@@ -2134,6 +2486,45 @@ async function detectLocalFolder() {                                   // does a
 }
 async function probeLocalOnce() { if (localProbed) return; localProbed = true; if (!localShouldShowSync() && await detectLocalFolder()) applyLocalOption(true); }
 
+function initBuildStamp() {                                 // deploy.sh fills the div's placeholder text with a real date, staged copy only
+  const el = $("build-stamp");                              // (never compare against that placeholder literally here — deploy.sh's
+  if (!el || !/^\d{4}-\d{2}-\d{2}/.test(el.textContent)) { if (el) el.remove(); return; }   //  blind sed replace would touch this string too, and did)
+  el.textContent = "Updated " + el.textContent;
+}
+
+/* ---- home layout vs panel layout — see the body.panel-layout CSS comment for the full picture.
+   Three independent triggers, any one of which is enough: the active plugin always wants panel
+   layout (dock: "always"), it earned its way there by asking for more room than home layout
+   allows (dock: "auto", promoted once — see setHeight in openPlugin), or the window itself is
+   too short for home layout regardless of which plugin is open (the original small-screen
+   safety net this mechanism started as). */
+const HOME_MAXH = () => Math.min(470, Math.round((window.innerHeight || 800) * 0.62));   // home-layout content cap — every plugin used to self-impose this; now the host owns it
+const SMALL_VIEWPORT_MAXH = 650;                            // below this, home layout risks clipping no matter what's open
+const CONTENT_PAD_Y = 40;                                   // generous top+bottom padding the centered block keeps once panel layout takes over
+function wantsPanelLayout() {
+  if (!activePlugin) return false;
+  if (window.innerHeight < SMALL_VIEWPORT_MAXH) return true;
+  const dock = activePlugin.dockOverride || activePlugin.def.dock;
+  return dock === "always" || (dock === "auto" && activePlugin.autoDocked === true);
+}
+function updatePanelLayout() {
+  document.body.classList.toggle("panel-layout", wantsPanelLayout());
+}
+// .above-box/.below-box collapse to ~0 in panel layout (see the CSS), so the centered block's
+// budget is just the viewport minus generous padding minus the omnibox row's own (fixed) height —
+// no dependency on the omnibox's on-screen POSITION, unlike the old docked-to-the-top design, so
+// there's no transition to race: field's own height doesn't change no matter what layout is active.
+function panelContentCeiling() {
+  return Math.max(200, window.innerHeight - CONTENT_PAD_Y * 2 - field.getBoundingClientRect().height - 16);
+}
+function currentHeightCeiling() {
+  return document.body.classList.contains("panel-layout") ? panelContentCeiling() : HOME_MAXH();
+}
+window.addEventListener("resize", () => {
+  updatePanelLayout();
+  if (activePlugin && activePlugin.lastPx != null) pluginPanel.style.height = Math.min(activePlugin.lastPx, currentHeightCeiling()) + "px";
+});
+
 function bindControls() {
   const set = (id, v) => { const el = $(id); el.type === "checkbox" ? (el.checked = v) : (el.value = v); };
   const sel = $("s-provider");                                       // registry-driven: each wallpaper plugin adds a source
@@ -2142,7 +2533,7 @@ function bindControls() {
   set("s-solid", S.bg.solid); set("s-local", (S.bg.local || []).join("\n"));
   set("s-clockStyle", S.clockStyle); set("s-clock24h", S.clock24h); set("s-seconds", S.showSeconds); set("s-name", S.name);
   set("s-wx-show", S.weather.show); set("s-wx-loc", S.weather.location || ""); set("s-wx-unit", S.weather.unit);
-  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-freqMin", S.freqMinVisits);
+  set("s-showSearch", S.showSearch); set("s-autofocus", S.autofocus); set("s-smartUrl", S.smartUrl); set("s-webSuggest", S.webSuggest); set("s-entitySuggest", S.entitySuggest); set("s-conversationSuggest", S.conversationSuggest); set("s-siteHistory", S.siteHistory); set("s-claudeTarget", S.claudeTarget); set("s-freqMin", S.freqMinVisits);
   $("s-engine").innerHTML = ENGINES.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
   $("s-engine").value = S.searchEngine;
   applyLocalOption(localShouldShowSync());                            // declutter the source list until a backgrounds/ folder is found
@@ -2209,8 +2600,15 @@ function bindControls() {
   $("s-autofocus").onchange = () => { S.autofocus = $("s-autofocus").checked; save(); };
   $("s-smartUrl").onchange = () => { S.smartUrl = $("s-smartUrl").checked; save(); updateMode(); };
   $("s-webSuggest").onchange = () => { S.webSuggest = $("s-webSuggest").checked; save(); if (!S.webSuggest) closeSuggest(); };
+  $("s-entitySuggest").onchange = () => { S.entitySuggest = $("s-entitySuggest").checked; save(); if (!S.entitySuggest) closeSuggest(); };
+  $("s-conversationSuggest").onchange = () => { S.conversationSuggest = $("s-conversationSuggest").checked; save(); if (!S.conversationSuggest) closeSuggest(); };
   $("s-siteHistory").onchange = () => { S.siteHistory = $("s-siteHistory").checked; save(); };
-  $("s-clearHistory").onclick = () => { localStorage.removeItem(K.hist); const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); renderFrequent(); };
+  $("s-clearHistory").onclick = () => {
+    tombstone((readLS(K.hist) || []).map((x) => x.key));
+    localStorage.removeItem(K.hist);
+    syncHistOnChange();
+    const b = $("s-clearHistory"); b.textContent = "Cleared"; setTimeout(() => { b.textContent = "Clear"; }, 1200); renderFrequent();
+  };
   $("s-freqMin").onchange = () => { S.freqMinVisits = +$("s-freqMin").value; save(); renderFrequent(); };
   bindSeg("seg-links", "linksSize", renderLinks);
   bindSeg("seg-frequent", "frequentSize", renderFrequent);
@@ -2299,9 +2697,11 @@ refreshBackground(false);
 renderLinks();
 loadWeather();
 bindControls();
+initBuildStamp();                                           // deploy.sh stamps this on the LIVE copy only — untouched here, it just hides
 handleShareHash();                                          // a shared "#import=" / bookmarklet link → offer to add the searches
 syncPendingToast();                                         // show a toast queued before a sync-triggered reload
 syncRevCheck();                                             // if a newer copy is on the server, pull it (then reload once)
+syncHistRevCheck();                                         // and quietly merge in any newer history — no reload needed for this one
 document.addEventListener("visibilitychange", () => { if (!document.hidden) syncFocusCheck(); });   // returning to the tab → auto-pull
 window.addEventListener("focus", syncFocusCheck);
 window.addEventListener("pageshow", assertFocus);

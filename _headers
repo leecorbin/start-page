@@ -1,0 +1,31 @@
+# Cloudflare Workers Static Assets default every response to
+# "Cache-Control: public, max-age=0, must-revalidate" — safe, but it means a
+# revalidation round-trip to the edge on every single visit, even though most of
+# this rarely changes between deploys. Override with something that actually
+# lets the browser skip that round-trip.
+#
+# /plugins/* is fetched with a "?v=APP_VERSION" cache-busting query string
+# (see index.html's plugin loader), so a given URL's content never changes —
+# safe to cache hard and long.
+/plugins/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Everything else (index.html, favicon.svg) isn't versioned in its URL. This is
+# the new-tab page — opened many times an hour — so "must-revalidate" was the
+# wrong tradeoff: every single open, even seconds after the last one, forced a
+# round-trip to the edge before the browser could paint anything, and on a slow
+# or congested connection that round-trip is exactly the "few seconds instead of
+# instant" a new tab should never have to pay. stale-while-revalidate fixes
+# this: within max-age it's an instant same-cache hit with zero network
+# involvement; past that (and within the swr window) the browser paints the
+# cached copy immediately and revalidates in the background, so the NEXT tab
+# gets anything new — nobody ever blocks on the network just to open a tab.
+# Listed explicitly (not "/*") so this block never overlaps /plugins/* above —
+# Cloudflare concatenates headers from every matching block rather than letting
+# the more specific one win, so an overlapping catch-all corrupts both.
+/
+  Cache-Control: public, max-age=60, stale-while-revalidate=86400
+/index.html
+  Cache-Control: public, max-age=60, stale-while-revalidate=86400
+/favicon.svg
+  Cache-Control: public, max-age=60, stale-while-revalidate=86400

@@ -15,6 +15,7 @@
 -->
 <link rel="preconnect" href="https://picsum.photos" crossorigin />
 <link rel="preconnect" href="https://fastly.picsum.photos" crossorigin />
+<link rel="preconnect" href="https://api.iconify.design" crossorigin />
 <link rel="dns-prefetch" href="https://api.open-meteo.com" />
 <style>
   :root {
@@ -1233,8 +1234,10 @@ function showImage(url, author, link, instant) {
 async function getPicsumList() {
   const c = readLS(K.list);
   if (c && Date.now() - c.ts < 864e5 && c.items && c.items.length) return c.items;
-  const items = [];
-  for (const p of [1, 2, 3]) { const r = await fetch(`https://picsum.photos/v2/list?page=${p}&limit=100`); items.push(...await r.json()); }
+  // three pages fetched in parallel, not a sequential await-loop — same 300 items,
+  // same once-a-day cost, but ~3x faster on the (roughly daily) cache-miss path
+  const pages = await Promise.all([1, 2, 3].map((p) => fetch(`https://picsum.photos/v2/list?page=${p}&limit=100`).then((r) => r.json())));
+  const items = pages.flat();
   writeLS(K.list, { ts: Date.now(), items });
   return items;
 }

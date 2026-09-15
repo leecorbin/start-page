@@ -1999,12 +1999,36 @@ async function syncPull() {
   syncSaveCfg({ ...c, rev: data.rev });
   return true;
 }
+// Applying a remote settings/favourites/watchlist update used to mean a hard
+// location.reload() — simple, but with sync genuinely working across devices
+// now, it means an occasional surprise reload just from switching back to a
+// tab. Everything sync touches (S, FAVS) can already be re-applied in place —
+// bindControls()+applyClockStyle()+…+loadWeather() is the exact sequence
+// Import and Reset-to-defaults already use for the same "settings changed out
+// from under the running page" situation. The only real risk is doing that
+// mid-interaction (typing, a plugin open, the settings panel open) — so this
+// defers rather than reloading OR silently overwriting whatever's in progress;
+// it just keeps retrying until a genuinely idle moment shows up.
+function syncSafeToApply() { return !activePlugin && !panel.classList.contains("open") && !input.value.trim(); }
+let syncApplyBusy = false, syncApplyRetryTimer = null;
+async function syncApplyPending() {
+  if (syncApplyBusy) return;
+  clearTimeout(syncApplyRetryTimer);
+  if (!syncSafeToApply()) { syncApplyRetryTimer = setTimeout(syncApplyPending, 15000); return; }
+  syncApplyBusy = true;
+  try {
+    if (!(await syncPull())) return;
+    S = load(); FAVS = readLS(K.favs) || [];
+    bindControls(); applyClockStyle(); startClock(); applySearch(); applyBgStyle(); refreshBackground(true); renderLinks(); loadWeather();
+    toast("Synced from another device ✓");
+  } finally { syncApplyBusy = false; }
+}
 async function syncRevCheck() {                                     // on load / focus: pull only if the server is newer
   const c = syncCfg(); if (!c) return;
   try {
     const r = await syncGET("/sync/" + (await syncId(c.code)) + "/rev");
     if (r.gone) return syncStopped("removed");
-    if ((r.rev || 0) > (c.rev || 0) && await syncPull()) { sessionStorage.setItem("startpage:toast", "Updated from another device ✓"); location.reload(); }
+    if ((r.rev || 0) > (c.rev || 0)) await syncApplyPending();
   } catch {}
 }
 
@@ -2699,9 +2723,9 @@ loadWeather();
 bindControls();
 initBuildStamp();                                           // deploy.sh stamps this on the LIVE copy only — untouched here, it just hides
 handleShareHash();                                          // a shared "#import=" / bookmarklet link → offer to add the searches
-syncPendingToast();                                         // show a toast queued before a sync-triggered reload
-syncRevCheck();                                             // if a newer copy is on the server, pull it (then reload once)
-syncHistRevCheck();                                         // and quietly merge in any newer history — no reload needed for this one
+syncPendingToast();                                         // show a toast queued before a sync-triggered reload (still used by "Connect existing")
+syncRevCheck();                                             // if a newer copy is on the server, apply it in place (deferred if you're mid-something) — no reload
+syncHistRevCheck();                                         // and quietly merge in any newer history the same way
 document.addEventListener("visibilitychange", () => { if (!document.hidden) syncFocusCheck(); });   // returning to the tab → auto-pull
 window.addEventListener("focus", syncFocusCheck);
 window.addEventListener("pageshow", assertFocus);
